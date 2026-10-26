@@ -1,0 +1,51 @@
+[project]
+name = "call-me-maybe"
+version = "0.1.0"
+description = "Function calling with llm-sdk"
+readme = "README.md"
+authors = [
+    { name = "Aman", email = "asuleime@student.42warsaw.pl" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "llm-sdk",
+    "numpy",
+    "pydantic",
+]
+
+[project.scripts]
+call-me-maybe = "src.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.workspace]
+members = [
+    "llm_sdk",
+]
+
+[tool.uv.sources]
+llm-sdk = { workspace = true }
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "src"
+
+[dependency-groups]
+dev = [
+    "flake8>=7.4.1",
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "model: integration tests that load the real LLM",
+    "golden: regression tests against frozen expected outputs",
+]
+
+[tool.mypy]
+exclude = "llm_sdk"
+mypy_path = "$MYPY_CONFIG_FILE_DIR/typings"
