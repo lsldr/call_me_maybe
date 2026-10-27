@@ -250,6 +250,38 @@ def test_run_settings_rejects_unsupported_profile_combinations(
         RunSettings(**settings)
 
 
+@pytest.mark.parametrize(
+    ("model_name", "context_limit"),
+    [
+        ("HuggingFaceTB/SmolLM2-135M-Instruct", 8192),
+        ("HuggingFaceTB/SmolLM-135M-Instruct", 2048),
+    ],
+)
+def test_new_smol_profiles_are_bonus_only_and_respect_context_limits(
+    model_name: str, context_limit: int,
+) -> None:
+    with pytest.raises(ValueError, match="alternate models require bonus"):
+        RunSettings(model_name=model_name)
+
+    accepted = RunSettings(
+        model_name=model_name, profile="bonus",
+        max_context_tokens=context_limit,
+    )
+    assert accepted.model_name == model_name
+    assert accepted.max_context_tokens == context_limit
+
+    with pytest.raises(ValueError, match="Context limit exceeds"):
+        RunSettings(
+            model_name=model_name, profile="bonus",
+            max_context_tokens=context_limit + 1,
+        )
+
+    with pytest.raises(ValueError, match="unsupported for"):
+        RunSettings(
+            model_name=model_name, profile="bonus", tokenizer="local",
+        )
+
+
 def test_vocab_hides_reserved_added_tokens_from_byte_grammar() -> None:
     table = VocabTable(
         vocab={"a": 0, "b": 1, "c": 2},

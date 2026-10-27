@@ -54,6 +54,8 @@ def _snapshot_files(vocab_size: int = 17) -> dict[str, bytes]:
 def test_profiles_pin_metadata_and_smollm2_sdk_only() -> None:
     qwen = get_profile("Qwen/Qwen3-0.6B")
     smol = get_profile("HuggingFaceTB/SmolLM2-360M-Instruct")
+    smol2_135 = get_profile("HuggingFaceTB/SmolLM2-135M-Instruct")
+    smol_135 = get_profile("HuggingFaceTB/SmolLM-135M-Instruct")
 
     assert qwen.revision == "c1899de289a04d12100db370d81485cdf75e47ca"
     assert qwen.expected_n_logits == 151936
@@ -65,6 +67,34 @@ def test_profiles_pin_metadata_and_smollm2_sdk_only() -> None:
     assert smol.max_context_tokens == 8192
     assert smol.required_tokens == (("<|im_start|>", 1), ("<|im_end|>", 2))
     assert smol.supported_tokenizers == ("sdk",)
+    assert smol2_135.revision == "12fd25f77366fa6b3b4b768ec3050bf629380bac"
+    assert smol2_135.context_family == "smollm2"
+    assert smol2_135.expected_n_logits == 49152
+    assert smol2_135.max_context_tokens == 8192
+    assert smol2_135.supported_tokenizers == ("sdk",)
+    assert smol2_135.required_tokens == (
+        ("<|im_start|>", 1), ("<|im_end|>", 2),
+    )
+    assert dict(smol2_135.asset_sha256)["config.json"] == (
+        "8eb740e8bbe4cff95ea7b4588d17a2432deb16e8075bc5828ff7ba9be94d982a"
+    )
+    assert dict(smol2_135.asset_sha256)["tokenizer_config.json"] == dict(
+        smol.asset_sha256
+    )["tokenizer_config.json"]
+    assert smol_135.revision == "fcc320f490e08fdb4b99d935b2c58d40bf35b0d0"
+    assert smol_135.context_family == "smollm2"
+    assert smol_135.expected_n_logits == 49152
+    assert smol_135.max_context_tokens == 2048
+    assert smol_135.supported_tokenizers == ("sdk",)
+    assert smol_135.required_tokens == (
+        ("<|im_start|>", 1), ("<|im_end|>", 2),
+    )
+    assert dict(smol_135.asset_sha256)["config.json"] == (
+        "d89dd5a56c63ac3d2f6cea098ad8aebd94e5fc4e4060fb61cd7e0e8bd0b678bb"
+    )
+    assert dict(smol_135.asset_sha256)["tokenizer_config.json"] == (
+        "75668bda11eb0d5ece137b4eb3fb2ad679f847fd19846b726369a26d92f9f28e"
+    )
 
     with pytest.raises(ValidationError):
         smol.model_id = "other/model"

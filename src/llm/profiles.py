@@ -52,18 +52,10 @@ _QWEN_ASSET_HASHES = (
         "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
     ),
 )
-_SMOL_ASSET_HASHES = (
-    (
-        "config.json",
-        "224f72354f10d617a359cc82ad15a3c96e866b9b2ffadb81997eeea9e88e22ee",
-    ),
+_SMOL_SHARED_ASSET_HASHES = (
     (
         "tokenizer.json",
         "9ca9acddb6525a194ec8ac7a87f24fbba7232a9a15ffa1af0c1224fcd888e47c",
-    ),
-    (
-        "tokenizer_config.json",
-        "4ec77d44f62efeb38d7e044a1db318f6a939438425312dfa333b8382dbad98df",
     ),
     (
         "vocab.json",
@@ -73,6 +65,26 @@ _SMOL_ASSET_HASHES = (
         "merges.txt",
         "0b54e8aa4e53d5383e2e4bc635a56b43f9647f7b13832d5d9ecd8f82dac4f510",
     ),
+)
+
+
+def _smol_asset_hashes(
+    config_hash: str,
+    tokenizer_config_hash: str = (
+        "4ec77d44f62efeb38d7e044a1db318f6a939438425312dfa333b8382dbad98df"
+    ),
+) -> tuple[tuple[str, str], ...]:
+    """Combine model-specific metadata with shared SmolLM tokenizer assets."""
+    return (
+        ("config.json", config_hash),
+        *_SMOL_SHARED_ASSET_HASHES[:1],
+        ("tokenizer_config.json", tokenizer_config_hash),
+        *_SMOL_SHARED_ASSET_HASHES[1:],
+    )
+
+
+_SMOL_ASSET_HASHES = _smol_asset_hashes(
+    "224f72354f10d617a359cc82ad15a3c96e866b9b2ffadb81997eeea9e88e22ee"
 )
 
 PROFILES: Mapping[str, ModelProfile] = MappingProxyType({
@@ -105,6 +117,37 @@ PROFILES: Mapping[str, ModelProfile] = MappingProxyType({
             ("<|im_end|>", 2),
         ),
         asset_sha256=_SMOL_ASSET_HASHES,
+    ),
+    "HuggingFaceTB/SmolLM2-135M-Instruct": ModelProfile(
+        model_id="HuggingFaceTB/SmolLM2-135M-Instruct",
+        revision="12fd25f77366fa6b3b4b768ec3050bf629380bac",
+        context_family="smollm2",
+        expected_n_logits=49152,
+        max_context_tokens=8192,
+        supported_tokenizers=("sdk",),
+        required_tokens=(
+            ("<|im_start|>", 1),
+            ("<|im_end|>", 2),
+        ),
+        asset_sha256=_smol_asset_hashes(
+            "8eb740e8bbe4cff95ea7b4588d17a2432deb16e8075bc5828ff7ba9be94d982a"
+        ),
+    ),
+    "HuggingFaceTB/SmolLM-135M-Instruct": ModelProfile(
+        model_id="HuggingFaceTB/SmolLM-135M-Instruct",
+        revision="fcc320f490e08fdb4b99d935b2c58d40bf35b0d0",
+        context_family="smollm2",
+        expected_n_logits=49152,
+        max_context_tokens=2048,
+        supported_tokenizers=("sdk",),
+        required_tokens=(
+            ("<|im_start|>", 1),
+            ("<|im_end|>", 2),
+        ),
+        asset_sha256=_smol_asset_hashes(
+            "d89dd5a56c63ac3d2f6cea098ad8aebd94e5fc4e4060fb61cd7e0e8bd0b678bb",
+            "75668bda11eb0d5ece137b4eb3fb2ad679f847fd19846b726369a26d92f9f28e",
+        ),
     ),
 })
 
