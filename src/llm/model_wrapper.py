@@ -1,7 +1,7 @@
 """Run greedy generation and constrained decoding with the public SDK."""
 
-from collections.abc import Collection
 import os
+from pathlib import Path
 from typing import Any, Literal
 
 from llm_sdk import Small_LLM_Model
@@ -38,6 +38,7 @@ class ModelWrapper(BaseModel):
         min_length=1,
         description="Name or Hugging Face hub ID of the target model.",
     )
+    snapshot_path: Path | None = None
     device: Literal["cpu", "cuda", "mps"] = Field(
         default_factory=_default_device,
         description="Execution device for model inference.",
@@ -68,13 +69,30 @@ class ModelWrapper(BaseModel):
         Args:
             __context: Optional initialization context from Pydantic.
         """
-        self._sdk = Small_LLM_Model(
-            model_name=self.model_name,
-            device=self.device,
-        )
-        self._vocab_file = self._sdk.get_path_to_vocab_file()
-        self._merges_file = self._sdk.get_path_to_merges_file()
-        self._tokenizer_file = self._sdk.get_path_to_tokenizer_file()
+        if self.snapshot_path is None:
+            self._sdk = Small_LLM_Model(
+                model_name=self.model_name, device=self.device,
+            )
+            self._vocab_file = self._sdk.get_path_to_vocab_file()
+            self._merges_file = self._sdk.get_path_to_merges_file()
+            self._tokenizer_file = self._sdk.get_path_to_tokenizer_file()
+        else:
+            snapshot = self.snapshot_path.resolve()
+            for filename in ("config.json", "tokenizer.json", "vocab.json",
+                             "merges.txt", "model.safetensors"):
+                if not (snapshot / filename).is_file():
+                    raise ValueError(
+                        f"Missing model asset: {snapshot / filename}"
+                    )
+            # The SDK accepts a local model directory publicly. Its Hub-only
+            # path helpers do not, so use those same referenced local assets.
+            self._sdk = Small_LLM_Model(
+                model_name=str(snapshot), device=self.device,
+                trust_remote_code=False,
+            )
+            self._vocab_file = str(snapshot / "vocab.json")
+            self._merges_file = str(snapshot / "merges.txt")
+            self._tokenizer_file = str(snapshot / "tokenizer.json")
 
     def encode(self, text: str) -> list[int]:
         """Convert text into a flat list of token IDs.
@@ -150,28 +168,3 @@ class ModelWrapper(BaseModel):
     def get_tokenizer_file_path(self) -> str:
         """Get the absolute path to tokenizer.json."""
         return self._tokenizer_file
-
-    def generate(
-        self,
-        prompt: str,
-        max_new_tokens: int = 16,
-        *,
-        stop_token_ids: Collection[int] = (),
-    ) -> str:
-        """Greedy unconstrained generation for smoke testing and debugging."""
-        if max_new_tokens < 1:
-            raise ValueError("max_new_tokens must be positive.")
-        input_ids = self.encode(prompt)
-        if not input_ids:
-            raise ValueError("The prompt must encode to at least one token.")
-
-        generated: list[int] = []
-        for _ in range(max_new_tokens):
-            scores = self.get_logits_from_input_ids(input_ids)
-            next_id = int(np.argmax(scores))
-            if next_id in stop_token_ids:
-                break
-            input_ids.append(next_id)
-            generated.append(next_id)
-
-        return self.decode(generated)

@@ -13,6 +13,13 @@ def write_json_file(file_path: str | Path, data: object) -> None:
     Create missing parent directories and a unique temporary file beside the
     destination. Reject nonfinite numbers. Propagate serialization, filesystem,
     and interrupt errors without letting temporary-file cleanup mask them.
+
+    Args:
+        file_path: Destination JSON file, replaced only after serialization.
+        data: Completed JSON-compatible Python values to serialize.
+
+    Returns:
+        None after the complete file has replaced its destination.
     """
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)

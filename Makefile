@@ -3,15 +3,16 @@ ARGS ?=
 PYTEST_ARGS ?=
 BENCH_ARGS ?=
 DEVICE ?= cpu
+TRACE ?=
 
 .DEFAULT_GOAL := install
-.PHONY: install run debug clean lint lint-strict test check
+.PHONY: install run debug clean lint lint-strict test check bench demo visualize
 
 install:
 	$(UV) sync --group dev
 
 run:
-	$(UV) run python -m src $(ARGS)
+	$(UV) run $(if $(findstring --visual,$(ARGS)),--extra visualization,) python -m src $(ARGS)
 
 debug:
 	$(UV) run python -m pdb -m src $(ARGS)
@@ -34,6 +35,17 @@ lint-strict:
 	$(UV) run mypy . --strict
 
 test:
-	$(UV) run pytest $(PYTEST_ARGS)
+	$(UV) run $(if $(findstring --visual,$(ARGS) $(PYTEST_ARGS)),--extra visualization,) pytest $(if $(findstring --visual,$(ARGS) $(PYTEST_ARGS)),-s,) $(ARGS) $(PYTEST_ARGS)
 
 check: lint-strict test
+
+bench:
+	$(UV) run $(if $(findstring --visual,$(BENCH_ARGS)),--extra visualization,) python -m src.evaluation.benchmark --device $(DEVICE) \
+		--output benchmarks/bonus/benchmark $(BENCH_ARGS)
+
+demo:
+	$(UV) run python -m src.evaluation.demo --device $(DEVICE) \
+		--output benchmarks/bonus/demonstration $(ARGS)
+
+visualize:
+	$(UV) run --extra visualization python -m src.visualization $(TRACE) $(ARGS)

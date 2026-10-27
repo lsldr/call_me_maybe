@@ -1,0 +1,12 @@
+{
+  "prompt": "Return one nested object in an array.",
+  "name": "fixture",
+  "parameters": {
+    "payload": [
+      {
+        "label": "inner",
+        "score": 7
+      }
+    ]
+  }
+}

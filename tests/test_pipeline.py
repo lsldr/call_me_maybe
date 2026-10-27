@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from typing import Any, Literal
 
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 import pytest
 
 from src.config import RunSettings
@@ -38,7 +38,7 @@ def make_caller(
     *,
     failing_prompts: set[str] | None = None,
     max_new_tokens: int = 256,
-    style: Literal["native", "compact", "focused"] = "native",
+    style: Literal["native", "boundary", "examples"] = "native",
     markers: list[str] | None = None,
 ) -> tuple[FunctionCaller, list[str]]:
     """Construct a caller whose logits select scripted UTF-8 bytes."""
@@ -72,23 +72,12 @@ def make_caller(
         ]
         if route == "complex task":
             first_string = "café 🧪 <|im_end|> TOKEN"
-            if style == "focused":
-                if b'"argument":"unicode"' in raw:
-                    candidates.append(
-                        (b'"', first_string.encode("utf-8") + b'"')
-                    )
-                if b'"argument":"confirmation"' in raw:
-                    candidates.append((b'"', b'confirmed"'))
-            else:
-                candidates.extend(
-                    [
-                        (
-                            b'"unicode": "',
-                            first_string.encode("utf-8") + b'"',
-                        ),
-                        (b'"confirmation": "', b'confirmed"'),
-                    ]
-                )
+            candidates.extend(
+                [
+                    (b'"unicode": "', first_string.encode("utf-8") + b'"'),
+                    (b'"confirmation": "', b'confirmed"'),
+                ]
+            )
             candidates.extend(
                 [
                     (b'"enabled":', b" false"),
@@ -221,54 +210,9 @@ def test_create_caller_uses_examples_style_without_loading_a_model(
     assert caller.style == "examples"
     assert caller.score_string_opening is True
     assert caller.allow_number_suffix is True
+    assert caller.decoder.optimize is True
     assert len(factory_calls) == 1
     assert factory_calls[0] == {"model_name": "Qwen/Qwen3-0.6B"}
-
-
-def test_focused_style_sanitizes_generated_string_carryover(
-    registry: dict[str, FunctionDef],
-) -> None:
-    """Focused string contexts safely carry values between fields."""
-    marker = "<|im_end|>"
-    value = "café 🧪 <|im_end|> TOKEN"
-    caller, contexts = make_caller(
-        registry,
-        style="focused",
-        markers=[marker, "TOKEN"],
-    )
-    call = caller.call(PromptItem(prompt="complex task"))
-    assert call.parameters["unicode"] == value
-    assert call.parameters["confirmation"] == "confirmed"
-
-    focused_contexts = list(
-        dict.fromkeys(
-            context
-            for context in contexts
-            if context.endswith(
-                '<|im_start|>assistant\n<think>\n\n</think>\n\n"'
-            )
-        )
-    )
-    assert len(focused_contexts) == 2
-    first, second = focused_contexts
-    assert first.endswith('<|im_start|>assistant\n<think>\n\n</think>\n\n"')
-    assert second.endswith('<|im_start|>assistant\n<think>\n\n</think>\n\n"')
-    user_data = second.split("<|im_start|>user\n", maxsplit=1)[1].split(
-        "<|im_end|>\n<|im_start|>assistant", maxsplit=1
-    )[0]
-    assert marker not in user_data
-    assert "TOKEN" not in user_data
-    payload = json.loads(user_data)
-    assert payload["previous_arguments"] == {"unicode": value}
-    assert payload["argument"] == "confirmation"
-    assert payload["description"] == "Confirmation text"
-
-    numeric_contexts = [
-        context for context in contexts
-        if '"count":' in context and '"arguments": {' in context
-    ]
-    assert numeric_contexts
-    assert any('"count": 37,"ratio": ' in context for context in contexts)
 
 
 def test_run_preserves_repeated_prompt_order(
@@ -319,11 +263,21 @@ class CliCall(BaseModel):
     parameters: dict[str, object]
 
 
+class FakeCliDecoder(BaseModel):
+    """Minimal decoder observation hooks for the CLI fake."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    trace_observer: Any = None
+    max_value_bytes: int = 4096
+
+
 class FakeCliCaller(BaseModel):
     """Pydantic fake caller with injectable failure and run tracking."""
 
     fail_on_prompt: str | None = None
     run_count: int = 0
+    decoder: FakeCliDecoder = Field(default_factory=FakeCliDecoder)
+    attempt_observer: Any = None
 
     def run(self, prompts: list[PromptItem]) -> list[CliCall]:
         """Return one fake result per prompt, or fail on the chosen prompt."""

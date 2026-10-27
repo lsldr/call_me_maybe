@@ -1,0 +1,45 @@
+[
+  {
+    "name": "fixture",
+    "description": "Scripted nested fixture",
+    "parameters": {
+      "payload": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "items": null,
+          "properties": {
+            "label": {
+              "type": "string",
+              "items": null,
+              "properties": null,
+              "description": null
+            },
+            "score": {
+              "type": "integer",
+              "items": null,
+              "properties": null,
+              "description": null
+            }
+          },
+          "description": null,
+          "required": [
+            "label",
+            "score"
+          ],
+          "additionalProperties": false
+        },
+        "properties": null,
+        "description": null,
+        "minItems": 1,
+        "maxItems": 2
+      }
+    },
+    "returns": {
+      "type": "string",
+      "items": null,
+      "properties": null,
+      "description": null
+    }
+  }
+]

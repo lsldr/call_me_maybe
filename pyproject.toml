@@ -13,6 +13,10 @@ dependencies = [
     "pydantic",
 ]
 
+[project.optional-dependencies]
+bonus = ["regex==2026.9.29"]
+visualization = ["rich==15.0.0"]
+
 [project.scripts]
 call-me-maybe = "src.__main__:main"
 
@@ -47,5 +51,5 @@ markers = [
 ]
 
 [tool.mypy]
-exclude = "llm_sdk"
+exclude = ["llm_sdk", "benchmarks"]
 mypy_path = "$MYPY_CONFIG_FILE_DIR/typings"

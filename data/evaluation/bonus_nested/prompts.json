@@ -1,0 +1,26 @@
+[
+  {
+    "prompt": "Use fn_store_record to store these input arguments exactly: {\"record\": {\"label\": \"alpha\", \"enabled\": true, \"scores\": [2, 3.5], \"note\": null}}. Do not calculate or transform values."
+  },
+  {
+    "prompt": "Use fn_store_record to store these input arguments exactly: {\"record\": {\"label\": \"beta\", \"enabled\": false, \"scores\": [], \"note\": null}}. Do not calculate or transform values."
+  },
+  {
+    "prompt": "Use fn_store_record to store these input arguments exactly: {\"record\": {\"label\": \"a\\\"b\\\\c\", \"enabled\": true, \"scores\": [-1, 0], \"note\": null}}. Do not calculate or transform values."
+  },
+  {
+    "prompt": "Use fn_store_items to store these input arguments exactly: {\"items\": [{\"name\": \"pen\", \"quantity\": 2}, {\"name\": \"book\", \"quantity\": 1}], \"tag\": \"office\"}. Do not calculate or transform values."
+  },
+  {
+    "prompt": "Use fn_store_items to store these input arguments exactly: {\"items\": [], \"tag\": \"empty\"}. Do not calculate or transform values."
+  },
+  {
+    "prompt": "Use fn_store_matrix to store these input arguments exactly: {\"matrix\": [[1, 2], [3, 4]]}. Do not calculate or transform values."
+  },
+  {
+    "prompt": "Use fn_store_matrix to store these input arguments exactly: {\"matrix\": [[], [0]]}. Do not calculate or transform values."
+  },
+  {
+    "prompt": "Use fn_store_empty to store these input arguments exactly: {\"empty_object\": {}, \"empty_array\": []}. Do not calculate or transform values."
+  }
+]

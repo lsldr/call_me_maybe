@@ -1,0 +1,94 @@
+[
+  {
+    "name": "fn_store_record",
+    "description": "Store a record with a label, enabled flag, numeric scores and optional note (null value). Copy input values.",
+    "parameters": {
+      "record": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "note": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    "returns": {
+      "type": "null"
+    }
+  },
+  {
+    "name": "fn_store_items",
+    "description": "Store a list of items with name and integer quantity, along with a batch tag. Copy input values.",
+    "parameters": {
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "quantity": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "tag": {
+        "type": "string"
+      }
+    },
+    "returns": {
+      "type": "null"
+    }
+  },
+  {
+    "name": "fn_store_matrix",
+    "description": "Store a numeric matrix, represented as an array of arrays of numbers.",
+    "parameters": {
+      "matrix": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "returns": {
+      "type": "null"
+    }
+  },
+  {
+    "name": "fn_store_empty",
+    "description": "Store an empty object and an empty array of strings.",
+    "parameters": {
+      "empty_object": {
+        "type": "object",
+        "properties": {}
+      },
+      "empty_array": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "returns": {
+      "type": "null"
+    }
+  }
+]

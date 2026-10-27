@@ -1,0 +1,53 @@
+[
+  {
+    "id": "regex-substring",
+    "category": "regex_substring",
+    "prompt": "Replace every occurrence of 'sun' with 'moon' in 'sunshine and sunset'.",
+    "expected": {
+      "name": "fn_substitute_string_with_regex",
+      "parameters": {
+        "source_string": "sunshine and sunset",
+        "regex": "sun",
+        "replacement": "moon"
+      }
+    },
+    "probes": [
+      "sun sunshine sunset",
+      "shadow"
+    ]
+  },
+  {
+    "id": "regex-digit-runs",
+    "category": "regex_digits",
+    "prompt": "In 'Room 12, floor 305', replace each run of digits with '#'.",
+    "expected": {
+      "name": "fn_substitute_string_with_regex",
+      "parameters": {
+        "source_string": "Room 12, floor 305",
+        "regex": "\\d+",
+        "replacement": "#"
+      }
+    },
+    "probes": [
+      "A12 B7",
+      "no digits"
+    ]
+  },
+  {
+    "id": "regex-vowels",
+    "category": "regex_vowels",
+    "prompt": "Replace each vowel in 'Lemon cake' with '*'.",
+    "expected": {
+      "name": "fn_substitute_string_with_regex",
+      "parameters": {
+        "source_string": "Lemon cake",
+        "regex": "[aeiouAEIOU]",
+        "replacement": "*"
+      }
+    },
+    "probes": [
+      "AEiouX",
+      "sky"
+    ]
+  }
+]

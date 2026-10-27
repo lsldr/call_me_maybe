@@ -1,0 +1,82 @@
+[
+  {
+    "id": "sum-negative-decimal",
+    "category": "number_addition",
+    "prompt": "What is -3.5 plus 8.25?",
+    "expected": {
+      "name": "fn_add_numbers",
+      "parameters": {
+        "a": -3.5,
+        "b": 8.25
+      }
+    }
+  },
+  {
+    "id": "sum-negative-values",
+    "category": "number_addition",
+    "prompt": "Add negative 12 to negative 4.",
+    "expected": {
+      "name": "fn_add_numbers",
+      "parameters": {
+        "a": -12,
+        "b": -4
+      }
+    }
+  },
+  {
+    "id": "sum-decimals",
+    "category": "number_addition",
+    "prompt": "Please add 0.75 and 2.5.",
+    "expected": {
+      "name": "fn_add_numbers",
+      "parameters": {
+        "a": 0.75,
+        "b": 2.5
+      }
+    }
+  },
+  {
+    "id": "greet-maya",
+    "category": "greeting",
+    "prompt": "Write a greeting for Maya.",
+    "expected": {
+      "name": "fn_greet",
+      "parameters": {
+        "name": "Maya"
+      }
+    }
+  },
+  {
+    "id": "reverse-phrase",
+    "category": "string_reverse",
+    "prompt": "Reverse this text: 'blue sky'.",
+    "expected": {
+      "name": "fn_reverse_string",
+      "parameters": {
+        "s": "blue sky"
+      }
+    }
+  },
+  {
+    "id": "reverse-empty-string",
+    "category": "string_reverse",
+    "prompt": "Reverse the empty string \"\".",
+    "expected": {
+      "name": "fn_reverse_string",
+      "parameters": {
+        "s": ""
+      }
+    }
+  },
+  {
+    "id": "square-root-decimal",
+    "category": "square_root",
+    "prompt": "Calculate the square root of 6.25.",
+    "expected": {
+      "name": "fn_get_square_root",
+      "parameters": {
+        "a": 6.25
+      }
+    }
+  }
+]

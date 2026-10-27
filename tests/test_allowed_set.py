@@ -5,7 +5,7 @@ import pytest
 from numpy.typing import NDArray
 from typing import Any, cast
 
-from src.constraints.allowed_set import best_allowed
+from src.constraints.allowed_set import best_allowed, best_sorted_allowed
 
 
 def test_selects_best_allowed_and_lowest_id_for_ties() -> None:
@@ -54,6 +54,15 @@ def test_rejects_nan_and_positive_infinity(bad_score: float) -> None:
 def test_negative_infinity_is_allowed_when_finite_choice_exists() -> None:
     scores = np.array([-np.inf, 3, -np.inf], dtype=np.float32)
     assert best_allowed(scores, np.array([2, 0, 1], dtype=np.int32)) == 1
+
+
+def test_sorted_fast_path_matches_public_selector() -> None:
+    """The trusted sorted path preserves winner and lowest-ID tie behavior."""
+    scores = np.array([5, 9, 9, -np.inf], dtype=np.float32)
+    sorted_ids = np.array([0, 1, 2, 3], dtype=np.int32)
+    assert best_sorted_allowed(scores, sorted_ids) == best_allowed(
+        scores, np.array([3, 2, 0, 1, 1], dtype=np.int32)
+    )
 
 
 def test_rejects_all_negative_infinity() -> None:

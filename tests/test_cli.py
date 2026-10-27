@@ -37,6 +37,7 @@ def invoke(paths: tuple[Path, Path, Path]) -> subprocess.CompletedProcess[str]:
     return run_cli(
         "--functions_definition", str(functions),
         "--input", str(inputs), "--output", str(output),
+        "--trace-output", str(output.parent / "trace.jsonl"),
     )
 
 
@@ -54,7 +55,8 @@ def test_empty_prompts(tmp_path: Path) -> None:
     result = invoke(paths)
     assert result.returncode == 0, result.stderr
     assert json.loads(paths[2].read_text()) == []
-    assert result.stdout == result.stderr == ""
+    assert result.stdout == ""
+    assert "Trace:" in result.stderr
 
 
 @pytest.mark.parametrize("file_index", [0, 1])
@@ -101,5 +103,5 @@ def test_output_failure(tmp_path: Path) -> None:
     assert "Traceback" not in result.stderr
     assert paths[2].is_dir()
     assert sorted(path.name for path in tmp_path.iterdir()) == [
-        "functions.json", "input.json", "output.json",
+        "functions.json", "input.json", "output.json", "trace.jsonl",
     ]

@@ -141,6 +141,10 @@ class VocabTable(BaseModel):
         self.id_to_bytes = self.build_id_to_bytes(
             self.vocab, self.n_logits
         )
+        # Some tokenizers include reserved tokens in vocab.json itself.
+        # Their IDs must remain unavailable to ordinary JSON value grammars.
+        for added_token in [*self.added_tokens, *tokenizer_tokens]:
+            self.id_to_bytes[added_token.id] = None
         self.first_byte_index = self.build_first_byte_index(
             self.id_to_bytes
         )

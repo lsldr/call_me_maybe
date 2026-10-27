@@ -8,6 +8,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from src.models.function_def import FunctionDef
 from src.models.prompt import FunctionCallResult, PromptItem
+from src.schemas.nested import SchemaLimits, validate_schema
 
 
 def read_json_file(file_path: str | Path) -> object:
@@ -34,11 +35,14 @@ def read_json_file(file_path: str | Path) -> object:
 
 def load_function_definitions(
     file_path: str | Path,
+    *, allow_nested: bool = False, schema_limits: SchemaLimits | None = None,
 ) -> dict[str, FunctionDef]:
     """Validate all definitions before returning a registry keyed by name.
 
     Args:
         file_path: Path to a JSON array of function definitions.
+        allow_nested: Enable the explicit bonus nested-schema subset.
+        schema_limits: Container depth, item and byte limits for bonus schemas.
 
     Returns:
         Validated definitions indexed by their unique function names.
@@ -62,6 +66,17 @@ def load_function_definitions(
                 f"Duplicate function '{definition.name}' in '{file_path}'."
             )
         seen.add(definition.name)
+        if allow_nested:
+            for key, parameter in definition.parameters.items():
+                try:
+                    validate_schema(parameter, schema_limits)
+                except ValueError as error:
+                    raise ValueError(
+                        f"Unsupported bonus schema {definition.name}.{key}: "
+                        f"{error}"
+                    ) from error
+            functions[definition.name] = definition
+            continue
         unsupported = {
             param.type for param in definition.parameters.values()
             if param.type not in {
@@ -103,6 +118,7 @@ def validate_function_calls(
     data: object,
     functions: dict[str, FunctionDef],
     prompts: list[PromptItem],
+    *, allow_nested: bool = False, schema_limits: SchemaLimits | None = None,
 ) -> list[FunctionCallResult]:
     """Validate generated calls against definitions and original prompts.
 
@@ -110,6 +126,8 @@ def validate_function_calls(
         data: Decoded JSON array produced by the generation pipeline.
         functions: Registry returned by load_function_definitions.
         prompts: Original prompts in input order.
+        allow_nested: Validate recursively in the explicit bonus profile.
+        schema_limits: Limits shared with the nested generation grammar.
 
     Returns:
         One validated call for each original prompt.
@@ -120,7 +138,10 @@ def validate_function_calls(
     """
 
     calls = TypeAdapter(list[FunctionCallResult]).validate_python(
-        data, context={"functions": functions}
+        data, context={
+            "functions": functions, "allow_nested": allow_nested,
+            "schema_limits": schema_limits,
+        }
     )
     if len(calls) != len(prompts):
         raise ValueError("Expected exactly one function call per prompt.")

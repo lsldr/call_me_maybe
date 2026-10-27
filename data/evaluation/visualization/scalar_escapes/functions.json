@@ -1,0 +1,26 @@
+[
+  {
+    "name": "fixture",
+    "description": "Scripted scalar fixture",
+    "parameters": {
+      "quantity": {
+        "type": "integer",
+        "items": null,
+        "properties": null,
+        "description": null
+      },
+      "note": {
+        "type": "string",
+        "items": null,
+        "properties": null,
+        "description": null
+      }
+    },
+    "returns": {
+      "type": "string",
+      "items": null,
+      "properties": null,
+      "description": null
+    }
+  }
+]

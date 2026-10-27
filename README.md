@@ -126,4 +126,5 @@ Input: `What is the sum of 2 and 3?`
 - [Python JSON documentation](https://docs.python.org/3/library/json.html)
 - [GPT-2 byte alphabet reference](https://github.com/openai/gpt-2/blob/master/src/encoder.py)
 
+### AI Usage
 GPT-6 Astra was used to write unit tests as per the author's directions, generate example prompts similar to those from the `zip_archives/data.zip` for author's approval. GPT-6 Luna agents were also used to run test suites and generate diagnostic reports.

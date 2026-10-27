@@ -1,0 +1,9 @@
+{
+  "prompt": "Show whole word and substring regex examples for cat.",
+  "name": "fixture",
+  "parameters": {
+    "source": "cat scattercat oncat catapult",
+    "whole_word_pattern": "\\bcat\\b",
+    "substring_pattern": "cat"
+  }
+}

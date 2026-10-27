@@ -2,14 +2,18 @@
 
 from collections.abc import Callable, Hashable
 from typing import TypeVar
+from time import perf_counter
 
 import numpy as np
 from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.constraints.allowed_set import best_allowed
+from src.constraints.allowed_set import best_allowed, best_sorted_allowed
 from src.constraints.set_cache import AllowedSetCache
 from src.decoding.tracer import TraceEvent
+from src.decoding.failures import DecodeFailure, FailureReason, GenerationUsage
+from src.diagnostics.performance import PerformanceStats, measure
+from src.diagnostics.state_views import snapshot
 from src.vocab.vocab_table import VocabTable
 
 State = TypeVar("State", bound=Hashable)
@@ -29,6 +33,25 @@ class Decoder(BaseModel):
     max_context_tokens: int = Field(default=1536, ge=1)
     cache: AllowedSetCache = Field(default_factory=AllowedSetCache)
     trace_observer: Callable[[TraceEvent], None] | None = None
+    performance: PerformanceStats | None = None
+    optimize: bool = False
+
+    def failure(
+        self, reason: FailureReason, message: str, *,
+        generated_tokens: int = 0, generated_bytes: int = 0,
+        context_tokens: int = 0, logits_calls: int = 0,
+        max_steps: int | None = None,
+    ) -> DecodeFailure:
+        """Describe a failed attempt without retaining generated payload."""
+        return DecodeFailure(reason, message, GenerationUsage(
+            generated_tokens=generated_tokens,
+            generated_bytes=generated_bytes,
+            context_tokens=context_tokens, logits_calls=logits_calls,
+            max_new_tokens=min(self.max_new_tokens,
+                               max_steps or self.max_new_tokens),
+            max_value_bytes=self.max_value_bytes,
+            max_context_tokens=self.max_context_tokens,
+        ))
 
     def decode(
         self,
@@ -65,37 +88,65 @@ class Decoder(BaseModel):
         observer = trace if trace is not None else self.trace_observer
         ids = list(context_ids)
         fragment = bytearray()
+        calls = 0
+
+        def failure(reason: FailureReason, message: str) -> DecodeFailure:
+            return self.failure(
+                reason, message, generated_tokens=len(ids) - len(context_ids),
+                generated_bytes=len(fragment), context_tokens=len(ids),
+                logits_calls=calls, max_steps=step_limit,
+            )
+
         for step in range(step_limit):
+            started = perf_counter() if observer is not None else 0.0
             if not ids or len(ids) > self.max_context_tokens:
-                raise ValueError("Context is empty or exceeds token limit.")
+                raise failure("context_limit",
+                              "Context is empty or exceeds token limit.")
             key = (namespace, state)
-            allowed = self.cache.get(key)
-            if allowed is None:
-                candidates: list[int] = []
-                for first in sorted(next_bytes(state)):
-                    group = self.vocab.first_byte_index.get(first)
-                    if group is None:
-                        continue
-                    for token in group:
-                        raw = self.vocab.id_to_bytes[int(token)]
-                        if raw and advance(state, raw) is not None:
-                            candidates.append(int(token))
-                allowed = np.array(sorted(candidates), dtype=np.int32)
-                self.cache.put(key, allowed)
+            with measure(self.performance, "candidates"):
+                allowed = self.cache.get(key)
+                if allowed is None:
+                    candidates: list[int] = []
+                    for first in sorted(next_bytes(state)):
+                        group = self.vocab.first_byte_index.get(first)
+                        if group is None:
+                            continue
+                        for token in group:
+                            raw = self.vocab.id_to_bytes[int(token)]
+                            if raw and advance(state, raw) is not None:
+                                candidates.append(int(token))
+                    allowed = self.cache.put(
+                        key, np.array(candidates, dtype=np.int32),
+                    )
             if not allowed.size:
-                raise ValueError("No allowed token continuation.")
-            scores = logits(ids)
+                raise failure("no_continuation",
+                              "No allowed token continuation.")
+            calls += 1
+            with measure(self.performance, "logits"):
+                scores = logits(ids)
             if scores.ndim != 1 or scores.size != self.vocab.n_logits:
-                raise ValueError("Model logits dimension changed.")
-            chosen = best_allowed(scores, allowed)
+                raise failure("invalid_logits",
+                              "Model logits dimension changed.")
+            try:
+                with measure(self.performance, "selection"):
+                    choose = (
+                        best_sorted_allowed if self.optimize else best_allowed
+                    )
+                    chosen = choose(scores, allowed)
+            except ValueError as error:
+                raise failure("invalid_logits", str(error)) from error
             raw = self.vocab.id_to_bytes[chosen]
             assert raw is not None
             trial = advance(state, raw)
             assert trial is not None
             if len(fragment) + len(raw) > self.max_value_bytes:
-                raise ValueError("Generated value exceeds byte limit.")
+                raise failure("byte_limit",
+                              "Generated value exceeds byte limit.")
             ids.append(chosen)
             fragment.extend(raw)
+            before = snapshot(
+                state, bytes(fragment[:-len(raw)]),
+            ) if observer else None
             state = trial
             done = complete(state)
             if observer is not None:
@@ -109,10 +160,14 @@ class Decoder(BaseModel):
                         state=repr(state),
                         byte_count=len(fragment),
                         max_steps=step_limit,
+                        before=before,
+                        after=snapshot(state, bytes(fragment)),
+                        elapsed_seconds=perf_counter() - started,
                     )
                 )
             if done:
                 return bytes(fragment), ids, state
-        raise ValueError(
+        raise failure(
+            "token_limit",
             "Generated value exceeds token limit before completion."
         )

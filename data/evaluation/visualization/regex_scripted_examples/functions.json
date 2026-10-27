@@ -1,0 +1,32 @@
+[
+  {
+    "name": "fixture",
+    "description": "Scripted regex display fixture",
+    "parameters": {
+      "source": {
+        "type": "string",
+        "items": null,
+        "properties": null,
+        "description": null
+      },
+      "whole_word_pattern": {
+        "type": "string",
+        "items": null,
+        "properties": null,
+        "description": null
+      },
+      "substring_pattern": {
+        "type": "string",
+        "items": null,
+        "properties": null,
+        "description": null
+      }
+    },
+    "returns": {
+      "type": "string",
+      "items": null,
+      "properties": null,
+      "description": null
+    }
+  }
+]

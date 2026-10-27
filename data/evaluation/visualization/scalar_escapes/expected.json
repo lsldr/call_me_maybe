@@ -1,0 +1,8 @@
+{
+  "prompt": "Return the integer and a string with quotes and a slash.",
+  "name": "fixture",
+  "parameters": {
+    "quantity": 42,
+    "note": "a quote: \" and a backslash: \\"
+  }
+}

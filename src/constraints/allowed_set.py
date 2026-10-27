@@ -19,6 +19,21 @@ def best_allowed(
 
     # Sorting and deduplication make tie behavior independent of input order.
     ids = np.unique(ids)
+    return best_sorted_allowed(scores, ids)
+
+
+def best_sorted_allowed(
+    logits: NDArray[np.float32], allowed: NDArray[np.int32]
+) -> int:
+    """Select from immutable sorted unique IDs without sorting or deduping."""
+    scores = np.asarray(logits)
+    ids = np.asarray(allowed)
+    if scores.ndim != 1 or ids.ndim != 1:
+        raise ValueError("logits and allowed must be 1D arrays")
+    if ids.dtype.kind not in "iu":
+        raise ValueError("allowed token IDs must be integers")
+    if ids.size == 0:
+        raise ValueError("no allowed tokens in this state")
     if np.any(ids < 0) or np.any(ids >= scores.size):
         raise ValueError(
             "allowed token IDs must be in the range [0, logits.size)"
@@ -33,6 +48,6 @@ def best_allowed(
     if not np.any(finite):
         raise ValueError("all allowed token logits are -inf")
 
-    # np.argmax returns the first maximum, and ids are sorted ascending.
+    # Caller supplies sorted unique IDs; np.argmax keeps lowest-ID ties.
     best_position = int(np.argmax(allowed_scores))
     return int(ids[best_position])

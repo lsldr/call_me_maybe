@@ -1,6 +1,7 @@
 """Optional observations emitted after a constrained token is committed."""
 
 from pydantic import BaseModel, ConfigDict
+from src.diagnostics.trace_schema import StateSnapshot
 
 
 class TraceEvent(BaseModel):
@@ -15,3 +16,6 @@ class TraceEvent(BaseModel):
     state: str
     byte_count: int
     max_steps: int
+    before: StateSnapshot | None = None
+    after: StateSnapshot | None = None
+    elapsed_seconds: float | None = None

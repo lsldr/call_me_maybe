@@ -1,0 +1,20 @@
+[
+  {
+    "name": "fixture",
+    "description": "Scripted retry fixture",
+    "parameters": {
+      "result": {
+        "type": "string",
+        "items": null,
+        "properties": null,
+        "description": null
+      }
+    },
+    "returns": {
+      "type": "string",
+      "items": null,
+      "properties": null,
+      "description": null
+    }
+  }
+]

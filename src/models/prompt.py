@@ -1,8 +1,11 @@
 """Schemas for natural-language inputs and generated function calls."""
 
-from pydantic import BaseModel, ConfigDict, ValidationInfo, model_validator
+from pydantic import (
+    BaseModel, ConfigDict, JsonValue, ValidationInfo, model_validator,
+)
 
 from src.models.function_def import FunctionDef
+from src.schemas.nested import validate_value
 
 
 class PromptItem(BaseModel):
@@ -25,7 +28,7 @@ class FunctionCallResult(BaseModel):
 
     prompt: str
     name: str
-    parameters: dict[str, str | int | float | bool | None]
+    parameters: dict[str, JsonValue]
 
     @model_validator(mode="after")
     def validate_function_contract(
@@ -68,6 +71,10 @@ class FunctionCallResult(BaseModel):
 
         for name, param in definition.parameters.items():
             value = self.parameters[name]
+
+            if info.context.get("allow_nested", False):
+                validate_value(value, param, info.context.get("schema_limits"))
+                continue
 
             if param.type == "string":
                 valid = isinstance(value, str)

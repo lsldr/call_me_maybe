@@ -1,0 +1,35 @@
+{
+  "provenance": "synthetic_scripted_scores",
+  "accuracy_claim": false,
+  "description": "Deterministic public-logits fixtures decoded through the real FunctionCaller and constrained Decoder; no model is loaded.",
+  "workloads": [
+    {
+      "name": "scalar_escapes",
+      "directory": "scalar_escapes",
+      "trace": "scalar_escapes/trace.jsonl",
+      "fixture_note": null,
+      "retry_fault": null
+    },
+    {
+      "name": "nested_array_object",
+      "directory": "nested_array_object",
+      "trace": "nested_array_object/trace.jsonl",
+      "fixture_note": null,
+      "retry_fault": null
+    },
+    {
+      "name": "recover_after_committed_prefix",
+      "directory": "recover_after_committed_prefix",
+      "trace": "recover_after_committed_prefix/trace.jsonl",
+      "fixture_note": null,
+      "retry_fault": "parameter:result"
+    },
+    {
+      "name": "regex_scripted_examples",
+      "directory": "regex_scripted_examples",
+      "trace": "regex_scripted_examples/trace.jsonl",
+      "fixture_note": "Patterns are displayed fixture strings. No regex engine or production compiler evaluates them.",
+      "retry_fault": null
+    }
+  ]
+}

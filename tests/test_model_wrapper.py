@@ -49,17 +49,15 @@ class TwoDimensionalLogitsSDK(FakeSDK):
         return [[0.0, 1.0]]
 
 
-def test_decode_and_generate_use_public_sdk_signature(
+def test_decode_and_logits_use_public_sdk_signature(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Final generation decoding works without unsupported SDK arguments."""
+    """Public SDK wrappers preserve valid signatures and count logits."""
     monkeypatch.setattr(model_wrapper, "Small_LLM_Model", FakeSDK)
     model = model_wrapper.ModelWrapper()
     assert model.decode([1, 0]) == "10"
-    assert model.generate("prompt", max_new_tokens=2) == "11"
-    assert model.call_count == 2
-    assert model.generate("prompt", stop_token_ids=[1]) == ""
-    assert model.call_count == 3
+    assert model.get_logits_from_input_ids([0]).tolist() == [0.0, 1.0]
+    assert model.call_count == 1
 
 
 @pytest.mark.parametrize("token_ids", [[True], cast(list[int], [1.5]), [-1]])
