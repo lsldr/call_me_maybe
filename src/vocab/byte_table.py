@@ -1,5 +1,11 @@
 def build_byte_to_unicode() -> dict[int, str]:
-    """Build a GPT-2 byte alphabet to unicode mapping."""
+    """
+    Build a GPT-2 byte alphabet to unicode mapping.
+
+    Returns:
+        Dictionary mapping byte values (0-255) to unicode characters
+        that map to GPT-2's byte-level BPE tokenizer.
+    """
     preserved_bytes = (
         list(range(33, 127)) + list(range(161, 173)) + list(range(174, 256))
     )

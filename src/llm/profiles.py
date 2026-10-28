@@ -186,6 +186,14 @@ def cached_snapshot(
 
 
 def _sha256(path: Path) -> str:
+    """Hash a metadata file without loading its entire contents into memory.
+
+    Args:
+        path: File whose bytes are checked against the pinned profile.
+
+    Returns:
+        Lowercase hexadecimal SHA-256 digest.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):

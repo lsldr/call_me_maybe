@@ -10,15 +10,24 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 
 def normalize_allowed(value: NDArray[Any]) -> NDArray[np.int32]:
-    """Return owned, immutable, sorted unique int32 candidate IDs."""
+    """Return owned, immutable, sorted unique int32 candidate IDs.
+
+    Args:
+        value: 1D array of candidate IDs, which must be nonnegative integers
+            that fit in int32.
+
+    Returns:
+        1D array of unique candidate IDs, sorted in ascending order.
+
+    Raises:
+        ValueError: if `value` is not a 1D array of nonnegative integers
+            that fit in int32."""
     ids = np.asarray(value)
     if ids.ndim != 1:
         raise ValueError("allowed must be a 1D array")
     if ids.dtype.kind not in "iu":
         raise ValueError("allowed token IDs must be integers")
-    if ids.size and (
-        np.any(ids < 0) or np.any(ids > np.iinfo(np.int32).max)
-    ):
+    if ids.size and (np.any(ids < 0) or np.any(ids > np.iinfo(np.int32).max)):
         raise ValueError("allowed token IDs must fit in nonnegative int32")
     normalized = np.unique(ids.astype(np.int32, copy=False))
     # Immutable bytes backing prevents callers from resetting writeable=True.
@@ -26,7 +35,16 @@ def normalize_allowed(value: NDArray[Any]) -> NDArray[np.int32]:
 
 
 class AllowedSetCache(BaseModel):
-    """Retain a bounded number of immutable candidate arrays per decoder."""
+    """Retain a bounded number of immutable candidate arrays per decoder.
+
+    Attributes:
+        capacity: Maximum number of cached arrays.
+        byte_capacity: Maximum combined NumPy storage used by cached arrays.
+        hits: Number of cache hits.
+        misses: Number of cache misses.
+        evictions: Number of cache evictions.
+        oversize_bypasses: Number of arrays that were too large to cache.
+    """
 
     model_config = ConfigDict(extra="forbid")
     capacity: int = Field(default=128, ge=0)

@@ -28,6 +28,14 @@ class TraceRecord(BaseModel):
 
     @model_validator(mode="after")
     def validate_data(self) -> "TraceRecord":
+        """Validate fields whose requirements depend on the event kind.
+
+        Returns:
+            This record after successful validation.
+
+        Raises:
+            ValueError: If event data is missing or contains invalid fields.
+        """
         data = self.data
         if self.kind == "token":
             required = {"step", "token_id", "raw_hex",
@@ -101,6 +109,17 @@ class StateSnapshot(BaseModel):
     @field_validator("pending_hex")
     @classmethod
     def validate_pending_hex(cls, value: str) -> str:
+        """Require the pending decoder bytes to be valid hexadecimal.
+
+        Args:
+            value: Hexadecimal text representing incomplete UTF-8 bytes.
+
+        Returns:
+            The validated hexadecimal text.
+
+        Raises:
+            ValueError: If the value is not valid hexadecimal.
+        """
         try:
             bytes.fromhex(value)
         except ValueError as exc:
@@ -110,10 +129,21 @@ class StateSnapshot(BaseModel):
 
 
 def _is_int(value: object) -> bool:
+    """Return whether a value is an integer but not a boolean."""
     return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _int_at_least(data: dict[str, JsonValue], key: str, minimum: int) -> None:
+    """Require a named JSON field to be an integer at least ``minimum``.
+
+    Args:
+        data: Event data mapping to inspect.
+        key: Required field name.
+        minimum: Inclusive lower bound.
+
+    Raises:
+        ValueError: If the field is absent, non-integer, or below the bound.
+    """
     value = data.get(key)
     if not _is_int(value) or cast(int, value) < minimum:
         raise ValueError(f"{key} must be an integer >= {minimum}")

@@ -15,7 +15,6 @@ from src.prompting.templates import ContextStyle
 from src.prompting.sanitize import safe_json
 from src.prompting.templates import (
     arguments_context,
-    build_context,
     tool_schema,
 )
 from src.schemas.nested import SchemaLimits
@@ -276,8 +275,8 @@ def test_nested_arguments_context_keeps_request_readable_and_schema_recursive(
     assert labels_schema["items"] == {"type": "string"}
 
 
-def test_scalar_examples_context_remains_on_existing_build_context_path(
-) -> None:
+def test_scalar_examples_context_preserves_readable_literals() -> None:
+    """Scalar contexts preserve JSON-quoted input without another escape layer."""  # noqa: E501
     definition = _definition({"label": TypeDef(type="string")})
     request = 'Set label to "a\\"b\\\\c".'
     markers = ["<|im_start|>"]
@@ -285,9 +284,8 @@ def test_scalar_examples_context_remains_on_existing_build_context_path(
     actual = arguments_context(
         definition, request, markers, style="examples",
     )
-    expected = (
-        build_context([definition], request, markers, style="examples")
-        + '{"name": "fn", "arguments": {'
-    )
-
-    assert actual == expected
+    user_turn = actual.split("<|im_start|>user\n", maxsplit=1)[1]
+    assert user_turn.startswith(request + "<|im_end|>\n")
+    assert "zero characters" in actual
+    assert safe_json(tool_schema(definition), markers) in actual
+    assert actual.endswith('{"name": "fn", "arguments": {')

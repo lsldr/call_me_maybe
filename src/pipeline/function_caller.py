@@ -365,37 +365,40 @@ def _create_caller(
     stats: PerformanceStats | None,
 ) -> FunctionCaller:
     """Load one SDK model and vocabulary, with no duplicated asset files."""
-    from src.llm.model_wrapper import ModelWrapper
+    with measure(stats, "sdk_import"):
+        from src.llm.model_wrapper import ModelWrapper
     from src.vocab.vocab_table import VocabTable
 
     if not functions:
         raise ValueError("No available functions for the input prompts.")
     profile = get_profile(settings.model_name)
-    if settings.profile == "bonus":
-        snapshot = validate_snapshot(
-            profile, settings.model_snapshot or cached_snapshot(profile),
-        )
-        model = ModelWrapper(
-            model_name=settings.model_name, snapshot_path=snapshot,
-            device=settings.device,
-        ) if settings.device is not None else ModelWrapper(
-            model_name=settings.model_name, snapshot_path=snapshot,
-        )
-    else:
-        model = ModelWrapper(
-            model_name=settings.model_name, device=settings.device,
-        ) if settings.device is not None else ModelWrapper(
-            model_name=settings.model_name,
-        )
+    with measure(stats, "model_load"):
+        if settings.profile == "bonus":
+            snapshot = validate_snapshot(
+                profile, settings.model_snapshot or cached_snapshot(profile),
+            )
+            model = ModelWrapper(
+                model_name=settings.model_name, snapshot_path=snapshot,
+                device=settings.device,
+            ) if settings.device is not None else ModelWrapper(
+                model_name=settings.model_name, snapshot_path=snapshot,
+            )
+        else:
+            model = ModelWrapper(
+                model_name=settings.model_name, device=settings.device,
+            ) if settings.device is not None else ModelWrapper(
+                model_name=settings.model_name,
+            )
     # Local mode must not reach the SDK encoder, even during warmup.
     with measure(stats, "warmup"):
         scores = model.logits(
             [0] if settings.tokenizer == "local" else model.encode("Warmup")
         )
-    vocab = VocabTable.from_files(
-        model.get_vocab_file_path(), model.get_tokenizer_file_path(),
-        len(scores),
-    )
+    with measure(stats, "vocabulary"):
+        vocab = VocabTable.from_files(
+            model.get_vocab_file_path(), model.get_tokenizer_file_path(),
+            len(scores),
+        )
     if settings.profile == "bonus":
         if vocab.n_logits != profile.expected_n_logits:
             raise ValueError("Logits dimension differs from model profile.")
@@ -409,11 +412,12 @@ def _create_caller(
     if settings.tokenizer == "local":
         from src.tokenization.local import ByteBPETokenizer
 
-        tokenizer = ByteBPETokenizer(
-            vocab=vocab,
-            tokenizer_path=Path(model.get_tokenizer_file_path()),
-            merges_path=Path(model.get_merges_file_path()),
-        )
+        with measure(stats, "local_tokenizer"):
+            tokenizer = ByteBPETokenizer(
+                vocab=vocab,
+                tokenizer_path=Path(model.get_tokenizer_file_path()),
+                merges_path=Path(model.get_merges_file_path()),
+            )
         encode = tokenizer.encode
     return FunctionCaller(
         functions=functions,

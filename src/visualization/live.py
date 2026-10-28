@@ -84,14 +84,34 @@ class LiveRenderer(BaseModel):
         self._opened = False
 
     def __enter__(self) -> "LiveRenderer":
+        """Open the renderer for use as a context manager.
+
+        Returns:
+            The opened renderer.
+        """
         return self.open()
 
     def __exit__(self, exc_type: object, exc: object,
                  traceback: object) -> Literal[False]:
+        """Close the renderer and allow any context exception to propagate.
+
+        Args:
+            exc_type: Exception class raised inside the context, if any.
+            exc: Exception instance raised inside the context, if any.
+            traceback: Traceback for the context exception, if any.
+
+        Returns:
+            ``False`` so exceptions are not suppressed.
+        """
         self.close()
         return False
 
     def _is_terminal(self) -> bool:
+        """Determine whether the configured stream supports terminal output.
+
+        Returns:
+            Explicit terminal setting, or the stream's TTY status.
+        """
         if self.terminal is not None:
             return self.terminal
         try:
@@ -100,12 +120,21 @@ class LiveRenderer(BaseModel):
             return False
 
     def _plain_event(self, record: TraceRecord) -> str:
+        """Render an event with reconstructed context for plain output.
+
+        Args:
+            record: Trace event being displayed.
+
+        Returns:
+            Bounded plain-text representation of the event and state.
+        """
         from src.visualization.plain import render_view
 
         # The view includes decoded bytes, attempt context, and grammar frames.
         return render_view(record, self._state) or render_record(record)
 
     def _stop_live(self) -> None:
+        """Stop and discard the Rich live display, ignoring cleanup errors."""
         if self._live is not None:
             try:
                 self._live.stop()

@@ -35,7 +35,14 @@ class StringValueDFA(BaseModel):
     def advance(
         self, state: StringValueState, raw: bytes
     ) -> StringValueState | None:
-        """Consume a token while preserving the full string value spelling."""
+        """Consume a token while preserving the full string value spelling.
+
+        Args:
+            state: The current prefix state.
+            raw: The bytes to consume.
+
+        Returns:
+            The new prefix state, or ``None`` if the token is invalid."""
         if not raw or self.is_complete(state):
             return None
 
@@ -46,6 +53,7 @@ class StringValueDFA(BaseModel):
             if raw[0] == ord(" "):
                 phase = "SPACE"
                 index = 1
+                # Skip any additional spaces.
                 if index == len(raw):
                     return StringValueState(phase=phase, inner=inner)
             elif raw[0] == ord('"'):
@@ -70,7 +78,13 @@ class StringValueDFA(BaseModel):
         return StringValueState(phase=phase, inner=inner)
 
     def next_bytes(self, state: StringValueState) -> set[int]:
-        """Return legal next bytes for this full-value prefix."""
+        """Return legal next bytes for this full-value prefix.
+
+        Args:
+            state: The current prefix state.
+
+        Returns:
+            A set of legal next bytes."""
         if self.is_complete(state):
             return set()
         if state.phase == "START":
@@ -82,10 +96,13 @@ class StringValueDFA(BaseModel):
         )
 
     def is_complete(self, state: StringValueState) -> bool:
-        """Return whether the string's close and following prefix were read."""
-        return (
-            state.phase == "CONTENT"
-            and StringBoundaryDFA(following=self.following).is_complete(
-                state.inner
-            )
-        )
+        """Return whether the string's close and following prefix were read.
+
+        Args:
+            state: The current prefix state.
+
+        Returns:
+            True if the string is complete, False otherwise."""
+        return state.phase == "CONTENT" and StringBoundaryDFA(
+            following=self.following
+        ).is_complete(state.inner)

@@ -27,16 +27,42 @@ _Container: TypeAlias = dict[str, object] | list[object]
 
 
 def _limits(limits: SchemaLimits | None) -> SchemaLimits:
+    """Return supplied schema limits or the default limits when omitted.
+
+    Args:
+        limits: Optional limits selected by the caller.
+
+    Returns:
+        The supplied limits or a new default ``SchemaLimits`` instance.
+    """
     return limits if limits is not None else SchemaLimits()
 
 
 def _extras(schema: TypeDef) -> dict[str, object]:
+    """Copy the schema's extra JSON Schema keywords into a plain mapping.
+
+    Args:
+        schema: Schema node whose extra fields are inspected.
+
+    Returns:
+        A mutable copy of its extra fields, or an empty mapping.
+    """
     return dict(schema.model_extra or {})
 
 
 def _validate_schema(
     schema: TypeDef, limits: SchemaLimits, depth: int
 ) -> None:
+    """Recursively validate node keywords, structure, and container depth.
+
+    Args:
+        schema: Schema node to validate.
+        limits: Resource limits applied to this schema tree.
+        depth: Current container nesting depth, with the root at one.
+
+    Raises:
+        ValueError: If the node uses unsupported or inconsistent schema data.
+    """
     if not isinstance(schema, TypeDef):
         raise ValueError("schema nodes must be TypeDef instances")
     extras = _extras(schema)
@@ -111,6 +137,15 @@ def _validate_schema(
 
 
 def _check_array_bound(bound: object, name: str) -> None:
+    """Require an array bound to be a nonnegative integer.
+
+    Args:
+        bound: Bound value taken from schema metadata.
+        name: Keyword name used in any validation error.
+
+    Raises:
+        ValueError: If the value is not an exact nonnegative integer.
+    """
     if type(bound) is not int or bound < 0:
         raise ValueError(f"{name} must be a nonnegative integer")
 
@@ -144,6 +179,17 @@ def array_bounds(
 
 def _validate_value(value: object, schema: TypeDef, limits: SchemaLimits,
                     depth: int) -> None:
+    """Recursively check a Python value against a validated schema node.
+
+    Args:
+        value: Python value being checked.
+        schema: Schema node governing the value.
+        limits: Resource limits applied to nested containers.
+        depth: Current container nesting depth, with the root at one.
+
+    Raises:
+        ValueError: If the value does not match the schema or depth limit.
+    """
     kind = schema.type
     if kind in _SCALARS:
         if kind == "string":

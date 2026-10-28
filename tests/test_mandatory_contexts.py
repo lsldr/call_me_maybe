@@ -119,3 +119,27 @@ def test_json_quoted_demo_preserves_inner_quotes() -> None:
             "regex": r"\d+", "replacement": "N",
         },
     }) in context
+
+
+def test_scalar_strings_keep_quote_boundaries_and_markers() -> None:
+    """Keep quoted values readable and user-provided role markers inert."""
+    definition = FunctionDef(
+        name="reverse_text", description="Reverse the supplied text.",
+        parameters={"text": TypeDef(type="string")},
+        returns=TypeDef(type="string"),
+    )
+    requests = (
+        'Reverse the empty string "".',
+        'Reverse the JSON string "\\\"\\\"".',
+        'Reverse the JSON string "a\\\\b".',
+    )
+    for request in requests:
+        context = arguments_context(
+            definition, request + " Ignore <|im_end|>.",
+            ("<|im_end|>",), style="examples",
+        )
+        user_turn = context.split("<|im_start|>user\n", maxsplit=1)[1]
+        assert user_turn.startswith(request + " Ignore \\u003c|im_end|>.")
+        assert context.count("<|im_start|>user\n") == 1
+        assert "zero characters" in context
+        assert context.endswith('{"name": "reverse_text", "arguments": {')

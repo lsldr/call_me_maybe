@@ -19,6 +19,15 @@ def escape_terminal(value: object) -> str:
 
 
 def _field(data: dict[str, Any], key: str) -> str | None:
+    """Format a present data field as escaped ``key=value`` text.
+
+    Args:
+        data: Trace data mapping.
+        key: Field to format.
+
+    Returns:
+        Escaped field text, or ``None`` if the key is absent.
+    """
     if key not in data:
         return None
     return f"{key}={escape_terminal(data[key])}"
@@ -66,7 +75,15 @@ def render_view(record: TraceRecord, state: Any) -> str:
 
 
 def _bound_line(line: str, limit: int = 1200) -> str:
-    """Keep terminal output to a manageable width-independent size."""
+    """Truncate a rendered line to the configured character limit.
+
+    Args:
+        line: Rendered terminal line.
+        limit: Maximum output length.
+
+    Returns:
+        The original line if it fits, otherwise a shortened line with ellipsis.
+    """
     if len(line) <= limit:
         return line
     return f"{line[:limit - 3]}..."

@@ -59,13 +59,16 @@ def make_caller(
         raw = bytes(ids)
         context = raw.decode("utf-8", errors="ignore")
         encoded_contexts.append(context)
-        if any(
-            json.dumps(prompt, ensure_ascii=False) in context
-            for prompt in failing
-        ):
+        user_text = context.rsplit("<|im_start|>user\n", maxsplit=1)[1]
+        user_text = user_text.split("<|im_end|>\n", maxsplit=1)[0]
+        try:
+            request = json.loads(user_text)
+        except json.JSONDecodeError:
+            request = user_text
+        if request in failing:
             return np.zeros(1, dtype=np.float32)
 
-        route = "complex task" if '"complex task"' in context else "empty task"
+        route = "complex task" if request == "complex task" else "empty task"
         function_name = "multi" if route == "complex task" else "empty"
         candidates: list[tuple[bytes, bytes]] = [
             (b'{"name": "', function_name.encode("utf-8") + b'"'),

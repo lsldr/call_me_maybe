@@ -4,7 +4,17 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+"""A phase of a number prefix state.
 
+    START: No bytes have been consumed yet.
+    SPACE: Only leading space bytes have been consumed.
+    SIGN: A leading minus sign has been consumed.
+    ZERO: A leading zero has been consumed.
+    INT: A non-zero integer prefix has been consumed.
+    DOT: A decimal point has been consumed.
+    FRAC: A fractional prefix has been consumed.
+    DONE: A complete number and its delimiter have been consumed.
+"""
 NumberPhase = Literal[
     "START", "SPACE", "SIGN", "ZERO", "INT", "DOT", "FRAC", "DONE"
 ]
@@ -36,6 +46,14 @@ class NumberDFA(BaseModel):
 
         The input state is never changed. The expected structural delimiter is
         accepted only after a complete number and only as the final byte.
+
+        Args:
+            state: The current number prefix state.
+            raw: The bytes to trial-consume.
+
+        Returns:
+            The new number prefix state if ``raw`` is a valid extension of
+            ``state``, or ``None`` if it is not.
         """
         if not raw or state.phase == "DONE":
             return None
@@ -44,7 +62,9 @@ class NumberDFA(BaseModel):
         for index, byte in enumerate(raw):
             if byte == ord(self.delimiter):
                 if index != len(raw) - 1 or phase not in {
-                    "ZERO", "INT", "FRAC"
+                    "ZERO",
+                    "INT",
+                    "FRAC",
                 }:
                     return None
                 return NumberState(phase="DONE")
@@ -103,7 +123,13 @@ class NumberDFA(BaseModel):
         return NumberState(phase=phase)
 
     def next_bytes(self, state: NumberState) -> set[int]:
-        """Return byte values legal as the next byte in ``state``."""
+        """Return byte values legal as the next byte in ``state``.
+
+        Args:
+            state: The current number prefix state.
+
+        Returns:
+            A set of legal byte values for the next byte."""
         digits = set(range(ord("0"), ord("9") + 1))
         if state.phase == "START":
             result = {ord("-"), ord("0"), *range(ord("1"), ord("9") + 1)}

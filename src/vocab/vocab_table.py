@@ -108,7 +108,7 @@ class VocabTable(BaseModel):
     @field_validator("tokenizer")
     @classmethod
     def validate_tokenizer(cls, v: dict[str, Any]) -> dict[str, Any]:
-        """Validate tokenizer configuration structure."""
+        """Validate tokenizer configuration structure against its model."""
         TypeAdapter(list[AddedToken]).validate_python(
             v.get("added_tokens", []), strict=True
         )
@@ -117,6 +117,9 @@ class VocabTable(BaseModel):
     @model_validator(mode="after")
     def validate_ids_within_logits(self) -> "VocabTable":
         """Validate IDs before deriving both lookup tables from the vocab.
+
+        Returns:
+            VocabTable with id_to_bytes and first_byte_index tables built.
 
         Raises:
             ValueError: If any token ID exceeds or equals n_logits.
@@ -138,16 +141,12 @@ class VocabTable(BaseModel):
                     f"Added token ID {added_token.id} exceeds "
                     f"n_logits ({self.n_logits})."
                 )
-        self.id_to_bytes = self.build_id_to_bytes(
-            self.vocab, self.n_logits
-        )
+        self.id_to_bytes = self.build_id_to_bytes(self.vocab, self.n_logits)
         # Some tokenizers include reserved tokens in vocab.json itself.
         # Their IDs must remain unavailable to ordinary JSON value grammars.
         for added_token in [*self.added_tokens, *tokenizer_tokens]:
             self.id_to_bytes[added_token.id] = None
-        self.first_byte_index = self.build_first_byte_index(
-            self.id_to_bytes
-        )
+        self.first_byte_index = self.build_first_byte_index(self.id_to_bytes)
         return self
 
     @staticmethod

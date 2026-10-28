@@ -4,15 +4,29 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-
+"""A phase of a string prefix state.
+    NORMAL: No special bytes have been consumed yet.
+    ESCAPE: A backslash has been consumed.
+    UNICODE: A Unicode escape sequence is being consumed.
+    LOW_SLASH: The backslash introducing a low surrogate is expected.
+    LOW_U: The letter u introducing a low surrogate is expected.
+    DONE: The closing quote has been consumed."""
 StringPhase = Literal[
     "NORMAL", "ESCAPE", "UNICODE", "LOW_SLASH", "LOW_U", "DONE"
 ]
 
 
 class StringState(BaseModel):
-    """Immutable state for a JSON string prefix."""
+    """Immutable state for a JSON string prefix.
 
+    Attributes:
+        phase: The current phase of the string.
+        utf8_remaining: The number of UTF-8 continuation bytes expected.
+        utf8_min: The minimum value for a UTF-8 continuation byte.
+        utf8_max: The maximum value for a UTF-8 continuation byte.
+        hex_remaining: The number of hexadecimal digits expected.
+        hex_value: The accumulated value of the hexadecimal digits.
+        low_surrogate: Whether a low surrogate is expected."""
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     phase: StringPhase = "NORMAL"
@@ -37,9 +51,22 @@ class StringDFA(BaseModel):
         return StringState()
 
     def advance(self, state: StringState, raw: bytes) -> StringState | None:
-        """Consume bytes and return a new state, or ``None`` on rejection."""
+        """Consume bytes and return a new state, or ``None`` on rejection.
+
+        The input state is never changed. The closing quote is accepted only
+        after a complete string and only as the final byte.
+
+        Args:
+            state: The current string prefix state.
+            raw: The bytes to trial-consume.
+
+        Returns:
+            The new string prefix state if ``raw`` is a valid extension of
+            ``state``, or ``None`` if it is not.
+        """
         if not raw or state.phase == "DONE":
             return None
+
         phase: StringPhase = state.phase
         remaining = state.utf8_remaining
         lower, upper = state.utf8_min, state.utf8_max
@@ -73,12 +100,18 @@ class StringDFA(BaseModel):
                     low_surrogate = False
                 else:
                     return None
+            # The UNICODE phase is a bit more complex because it needs to
+            # handle surrogate pairs correctly.
             elif phase == "UNICODE":
                 digit = _hex_value(byte)
                 if digit is None:
                     return None
+                # Accumulate the hex value and check if we have
+                # a complete Unicode escape.
                 hex_value = (hex_value << 4) | digit
                 hex_remaining -= 1
+                # If we have consumed all hex digits, we need to check if the
+                # value is a high or low surrogate, or a normal code point.
                 if hex_remaining == 0:
                     if low_surrogate:
                         if not 0xDC00 <= hex_value <= 0xDFFF:
@@ -96,6 +129,8 @@ class StringDFA(BaseModel):
                         phase = "NORMAL"
                         hex_value = 0
                     hex_remaining = 0
+            # The NORMAL phase is the default state where we expect either
+            # a valid UTF-8 byte, an escape sequence, or the closing quote.
             else:
                 if byte < 0x20:
                     return None
@@ -135,7 +170,14 @@ class StringDFA(BaseModel):
         )
 
     def next_bytes(self, state: StringState) -> set[int]:
-        """Return every byte that can legally extend ``state``."""
+        """Return every byte that can legally extend ``state``.
+
+        Args:
+            state: The current string prefix state.
+
+        Returns:
+            A set of bytes that can legally extend the given state.
+        """
         return {
             byte
             for byte in range(256)
@@ -148,7 +190,15 @@ class StringDFA(BaseModel):
 
 
 def _hex_value(byte: int) -> int | None:
-    """Return a hexadecimal digit value, or ``None`` for other bytes."""
+    """Return a hexadecimal digit value, or ``None`` for other bytes.
+
+    Args:
+        byte: A single byte to interpret as a hexadecimal digit.
+
+    Returns:
+        The integer value of the hexadecimal digit,
+        or ``None`` if the byte is not a valid hexadecimal digit.
+    """
     if ord("0") <= byte <= ord("9"):
         return byte - ord("0")
     if ord("a") <= byte <= ord("f"):

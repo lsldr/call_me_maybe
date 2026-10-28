@@ -49,12 +49,25 @@ def select_trace(
 
 
 def _trace_sort_key(path: Path) -> tuple[int, str]:
+    """Sort numbered traces newest first, then by filename.
+
+    Args:
+        path: Trace path whose leading numeric prefix determines order.
+
+    Returns:
+        Sort key with descending numeric prefix and filename tie-breaker.
+    """
     match = re.match(r"^(\d+)_", path.name)
     number = int(match.group(1)) if match is not None else 0
     return -number, path.name
 
 
 def main() -> int:
+    """Run the offline trace viewer command-line interface.
+
+    Returns:
+        Process status code: zero on success, nonzero on read/render errors.
+    """
     parser = argparse.ArgumentParser(
         description="View a diagnostic trace offline"
     )

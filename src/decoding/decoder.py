@@ -24,6 +24,16 @@ class Decoder(BaseModel):
     """Own one vocabulary and its bounded legal-token cache.
 
     Model access is injected as a public callable, so unit tests need no SDK.
+
+    Attributes:
+        vocab: The shared vocabulary table for all decoding.
+        max_new_tokens: Maximum tokens to generate per call.
+        max_value_bytes: Maximum bytes to generate per call.
+        max_context_tokens: Maximum tokens to retain in the context.
+        cache: Cache of allowed token sets for each constraint state.
+        trace_observer: Optional callback for each token selection.
+        performance: Optional performance statistics collector.
+        optimize: Whether to use a slower but more accurate algorithm.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
@@ -37,21 +47,32 @@ class Decoder(BaseModel):
     optimize: bool = False
 
     def failure(
-        self, reason: FailureReason, message: str, *,
-        generated_tokens: int = 0, generated_bytes: int = 0,
-        context_tokens: int = 0, logits_calls: int = 0,
+        self,
+        reason: FailureReason,
+        message: str,
+        *,
+        generated_tokens: int = 0,
+        generated_bytes: int = 0,
+        context_tokens: int = 0,
+        logits_calls: int = 0,
         max_steps: int | None = None,
     ) -> DecodeFailure:
         """Describe a failed attempt without retaining generated payload."""
-        return DecodeFailure(reason, message, GenerationUsage(
-            generated_tokens=generated_tokens,
-            generated_bytes=generated_bytes,
-            context_tokens=context_tokens, logits_calls=logits_calls,
-            max_new_tokens=min(self.max_new_tokens,
-                               max_steps or self.max_new_tokens),
-            max_value_bytes=self.max_value_bytes,
-            max_context_tokens=self.max_context_tokens,
-        ))
+        return DecodeFailure(
+            reason,
+            message,
+            GenerationUsage(
+                generated_tokens=generated_tokens,
+                generated_bytes=generated_bytes,
+                context_tokens=context_tokens,
+                logits_calls=logits_calls,
+                max_new_tokens=min(
+                    self.max_new_tokens, max_steps or self.max_new_tokens
+                ),
+                max_value_bytes=self.max_value_bytes,
+                max_context_tokens=self.max_context_tokens,
+            ),
+        )
 
     def decode(
         self,
@@ -91,17 +112,31 @@ class Decoder(BaseModel):
         calls = 0
 
         def failure(reason: FailureReason, message: str) -> DecodeFailure:
+            """Build a failure with counters captured at this decode point.
+
+            Args:
+                reason: Stable reason code for the failure.
+                message: Human-readable failure explanation.
+
+            Returns:
+                A typed failure with current generation usage.
+            """
             return self.failure(
-                reason, message, generated_tokens=len(ids) - len(context_ids),
-                generated_bytes=len(fragment), context_tokens=len(ids),
-                logits_calls=calls, max_steps=step_limit,
+                reason,
+                message,
+                generated_tokens=len(ids) - len(context_ids),
+                generated_bytes=len(fragment),
+                context_tokens=len(ids),
+                logits_calls=calls,
+                max_steps=step_limit,
             )
 
         for step in range(step_limit):
             started = perf_counter() if observer is not None else 0.0
             if not ids or len(ids) > self.max_context_tokens:
-                raise failure("context_limit",
-                              "Context is empty or exceeds token limit.")
+                raise failure(
+                    "context_limit", "Context is empty or exceeds token limit."
+                )
             key = (namespace, state)
             with measure(self.performance, "candidates"):
                 allowed = self.cache.get(key)
@@ -116,17 +151,20 @@ class Decoder(BaseModel):
                             if raw and advance(state, raw) is not None:
                                 candidates.append(int(token))
                     allowed = self.cache.put(
-                        key, np.array(candidates, dtype=np.int32),
+                        key,
+                        np.array(candidates, dtype=np.int32),
                     )
             if not allowed.size:
-                raise failure("no_continuation",
-                              "No allowed token continuation.")
+                raise failure(
+                    "no_continuation", "No allowed token continuation."
+                )
             calls += 1
             with measure(self.performance, "logits"):
                 scores = logits(ids)
             if scores.ndim != 1 or scores.size != self.vocab.n_logits:
-                raise failure("invalid_logits",
-                              "Model logits dimension changed.")
+                raise failure(
+                    "invalid_logits", "Model logits dimension changed."
+                )
             try:
                 with measure(self.performance, "selection"):
                     choose = (
@@ -140,13 +178,19 @@ class Decoder(BaseModel):
             trial = advance(state, raw)
             assert trial is not None
             if len(fragment) + len(raw) > self.max_value_bytes:
-                raise failure("byte_limit",
-                              "Generated value exceeds byte limit.")
+                raise failure(
+                    "byte_limit", "Generated value exceeds byte limit."
+                )
             ids.append(chosen)
             fragment.extend(raw)
-            before = snapshot(
-                state, bytes(fragment[:-len(raw)]),
-            ) if observer else None
+            before = (
+                snapshot(
+                    state,
+                    bytes(fragment[: -len(raw)]),
+                )
+                if observer
+                else None
+            )
             state = trial
             done = complete(state)
             if observer is not None:
@@ -169,5 +213,5 @@ class Decoder(BaseModel):
                 return bytes(fragment), ids, state
         raise failure(
             "token_limit",
-            "Generated value exceeds token limit before completion."
+            "Generated value exceeds token limit before completion.",
         )

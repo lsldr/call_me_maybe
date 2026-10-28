@@ -32,6 +32,15 @@ class ByteBPETokenizer(BaseModel):
 
     @model_validator(mode="after")
     def _load_profile(self) -> "ByteBPETokenizer":
+        """Load tokenizer metadata, validate it, and prepare BPE lookup data.
+
+        Returns:
+            This tokenizer after its profile data has been initialized.
+
+        Raises:
+            FileNotFoundError: If the tokenizer or merges file is missing.
+            ValueError: If the supplied profile or its assets are inconsistent.
+        """
         if not self.tokenizer_path.is_file():
             raise FileNotFoundError(
                 f"Tokenizer file not found: {self.tokenizer_path}"
@@ -74,9 +83,32 @@ class ByteBPETokenizer(BaseModel):
     def _validate_profile(
         self, data: dict[str, object], n_logits: int
     ) -> None:
+        """Check tokenizer metadata against the supported pinned BPE profile.
+
+        Args:
+            data: Parsed top-level contents of ``tokenizer.json``.
+            n_logits: Vocabulary size expected by the supplied token table.
+
+        Raises:
+            ValueError: If any component or option differs from the profile.
+        """
         def require(
             obj: object, key: str, expected: object, where: str
         ) -> dict[str, object]:  # noqa: E501
+            """Check a mapping field's exact type and value.
+
+            Args:
+                obj: Object expected to be a mapping.
+                key: Field name to check.
+                expected: Required field value and type.
+                where: Component path used in validation errors.
+
+            Returns:
+                The input mapping after its field has been validated.
+
+            Raises:
+                ValueError: If the object is not a mapping or field mismatches.
+            """
             if not isinstance(obj, dict):
                 raise ValueError(f"Unsupported tokenizer component at {where}")
             value = obj.get(key)
@@ -235,6 +267,18 @@ class ByteBPETokenizer(BaseModel):
             raise ValueError("Added-token metadata does not match VocabTable")
 
     def _read_merges(self, model_merges: object) -> dict[tuple[str, str], int]:
+        """Read merge ranks and verify exact agreement with tokenizer metadata.
+
+        Args:
+            model_merges: Ordered merge pairs from the tokenizer model section.
+
+        Returns:
+            A mapping from adjacent symbol pairs to their merge ranks.
+
+        Raises:
+            ValueError: If merge syntax, order, count, or vocabulary is
+                invalid.
+        """
         if not isinstance(model_merges, list):
             raise ValueError(
                 "BPE model merges must be an ordered list of pairs"
@@ -321,6 +365,17 @@ class ByteBPETokenizer(BaseModel):
         return result
 
     def _encode_ordinary(self, text: str) -> list[int]:
+        """Normalize and encode text that contains no added tokens.
+
+        Args:
+            text: Ordinary text segment to tokenize.
+
+        Returns:
+            Token IDs produced by pre-tokenization and byte BPE merges.
+
+        Raises:
+            ValueError: If a resulting token is absent from the vocabulary.
+        """
         text = unicodedata.normalize("NFC", text)
         pieces: list[str] = []
         last = 0
@@ -357,6 +412,11 @@ class ByteBPETokenizer(BaseModel):
         queue: list[tuple[int, int, int, int, int, str, str]] = []
 
         def enqueue(left: int) -> None:
+            """Queue the ranked merge candidate starting at a live symbol.
+
+            Args:
+                left: Index of the left symbol in the linked symbol sequence.
+            """
             right = following[left]
             if right < 0:
                 return

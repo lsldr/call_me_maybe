@@ -32,6 +32,14 @@ class StringBoundaryDFA(BaseModel):
 
         A token may end within the string, close the string, or continue into
         a prefix of ``following`` after the unescaped closing quote.
+
+        Args:
+            state: The current string state and suffix.
+            raw: The bytes to consume.
+
+        Returns:
+            The new string state and suffix,
+            or ``None`` if the token is invalid.
         """
         if not raw or self.is_complete(state):
             return None
@@ -44,13 +52,14 @@ class StringBoundaryDFA(BaseModel):
         for index, byte in enumerate(raw):
             if byte != ord('"'):
                 continue
-            closed = dfa.advance(state.inner, raw[:index + 1])
+            closed = dfa.advance(state.inner, raw[: index + 1])
             if closed is None or not dfa.is_complete(closed):
                 continue
+            # The string is closed, so check for a prefix of ``following``.
             extra = raw[index + 1:]
             if len(extra) > len(self.following):
                 continue
-            if extra == self.following[:len(extra)]:
+            if extra == self.following[: len(extra)]:
                 return StringBoundaryState(inner=closed, suffix=extra)
         return None
 

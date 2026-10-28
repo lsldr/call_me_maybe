@@ -33,6 +33,12 @@ def _offline_environment() -> None:
 
 
 def _write_json(path: Path, value: object) -> None:
+    """Atomically replace a JSON output file with an indented value.
+
+    Args:
+        path: Destination file path.
+        value: JSON-serializable object to write.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(
@@ -155,6 +161,7 @@ def _execute_case(
     pending_context: dict[str, Any] | None = None
 
     def context_observer(phase: str, text: str) -> None:
+        """Collect rendered prompt context and forward it to its observer."""
         nonlocal pending_context
         pending_context = {"phase": phase, "text": text}
         contexts.append(pending_context)
@@ -162,6 +169,7 @@ def _execute_case(
             original_context(phase, text)
 
     def encode(text: str) -> list[int]:
+        """Encode text and associate IDs with the pending context record."""
         nonlocal pending_context
         ids = original_encode(text)
         if pending_context is not None:
@@ -170,12 +178,14 @@ def _execute_case(
         return ids
 
     def selection_observer(name: str) -> None:
+        """Remember the selected function and forward the selection."""
         nonlocal selected
         selected = name
         if original_selection is not None:
             original_selection(name)
 
     def attempt_observer(kind: str, data: dict[str, Any]) -> None:
+        """Collect attempt metadata and forward attempt lifecycle events."""
         nonlocal current_attempt
         if kind == "attempt_start":
             current_attempt = {
@@ -188,6 +198,7 @@ def _execute_case(
             original_attempt(kind, data)
 
     def token_observer(event: Any) -> None:
+        """Collect token IDs and bytes for the active attempt."""
         if current_attempt is not None:
             current_attempt["token_ids"].append(event.token_id)
             current_attempt["raw_hex"].append(event.raw.hex())
@@ -277,6 +288,16 @@ def _benchmark_settings(
     tokenizer: Literal["sdk", "local"],
     visual: bool,
 ) -> RunSettings:
+    """Build settings for benchmark execution with the requested backend.
+
+    Args:
+        device: Execution device.
+        tokenizer: Tokenizer implementation to use.
+        visual: Whether live trace visualization is enabled.
+
+    Returns:
+        Settings configured for the selected tokenizer and device.
+    """
     return RunSettings(
         device=device,
         profile="bonus" if tokenizer == "local" else "mandatory",
@@ -404,6 +425,11 @@ def run_benchmark(
 
 
 def main() -> int:
+    """Parse CLI options, run the benchmark, and return its exit status.
+
+    Returns:
+        Zero when the benchmark passes, otherwise one.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(

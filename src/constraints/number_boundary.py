@@ -27,9 +27,19 @@ class NumberBoundaryDFA(BaseModel):
         return NumberBoundaryState(inner=self.number.initial_state())
 
     def advance(
-        self, state: NumberBoundaryState, raw: bytes,
+        self,
+        state: NumberBoundaryState,
+        raw: bytes,
     ) -> NumberBoundaryState | None:
-        """Trial-consume bytes, retaining rather than dropping suffix bytes."""
+        """Trial-consume bytes, retaining rather than dropping suffix bytes.
+
+        Args:
+            state: The current number boundary state.
+            raw: The bytes to consume.
+
+        Returns:
+            The new number boundary state if ``raw`` is a valid extension of
+            ``state``, or ``None`` if it is not."""
         if not raw or self.number.is_complete(state.inner):
             return None
 
@@ -41,30 +51,47 @@ class NumberBoundaryDFA(BaseModel):
         for index, byte in enumerate(raw):
             if byte != delimiter:
                 continue
+            # The delimiter is only valid if the number is complete
+            # and it is the last byte.
             number_state = self.number.advance(
-                state.inner, raw[:index + 1],
+                state.inner,
+                raw[: index + 1],
             )
             if number_state is None or not self.number.is_complete(
                 number_state
             ):
                 continue
+            # The delimiter is valid, but we need to check the suffix.
             suffix = raw[index + 1:]
-            valid_suffix = (
-                len(suffix) <= len(self.following)
-                and self.following.startswith(suffix)
-            )
+            # The suffix is valid if it leads to a valid syntax.
+            valid_suffix = len(suffix) <= len(
+                self.following
+            ) and self.following.startswith(suffix)
             if valid_suffix:
                 return NumberBoundaryState(
-                    inner=number_state, suffix=suffix,
+                    inner=number_state,
+                    suffix=suffix,
                 )
         return None
 
     def next_bytes(self, state: NumberBoundaryState) -> set[int]:
-        """Return legal number bytes until its delimiter is consumed."""
+        """Return legal number bytes until its delimiter is consumed.
+
+        Args:
+            state: The current number boundary state.
+
+        Returns:
+            A set of legal byte values for the next byte."""
         if self.is_complete(state):
             return set()
         return self.number.next_bytes(state.inner)
 
     def is_complete(self, state: NumberBoundaryState) -> bool:
-        """Delegate completion to the wrapped number DFA."""
+        """Delegate completion to the wrapped number DFA.
+
+        Args:
+            state: The current number boundary state.
+
+        Returns:
+            True if the number is complete, False otherwise."""
         return self.number.is_complete(state.inner)

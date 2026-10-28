@@ -52,6 +52,13 @@ class DecodeFailure(ValueError):
     def __init__(
         self, reason: FailureReason, message: str, usage: GenerationUsage
     ) -> None:
+        """Create a decode error with a stable reason and usage snapshot.
+
+        Args:
+            reason: Machine-readable reason for the failed attempt.
+            message: Human-readable explanation passed to ``ValueError``.
+            usage: Immutable counters and configured limits at failure time.
+        """
         super().__init__(message)
         self.reason = reason
         self.usage = usage

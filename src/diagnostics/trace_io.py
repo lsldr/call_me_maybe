@@ -129,6 +129,11 @@ class TraceWriter(BaseModel):
             file.close()
 
     def _end_reserve(self) -> int:
+        """Return the maximum encoded space reserved for a terminal record.
+
+        Returns:
+            Byte length reserved for the bounded ``run_end`` record.
+        """
         reserve_record = TraceRecord(
             kind="run_end", seq=self._seq + 1,
             data={"truncated": True, "original_status": "\\" * 64,
@@ -137,6 +142,14 @@ class TraceWriter(BaseModel):
         return len(_encode(reserve_record))
 
     def _write(self, encoded: bytes) -> None:
+        """Write a complete encoded record, closing the file on I/O failure.
+
+        Args:
+            encoded: Newline-terminated JSON record bytes.
+
+        Raises:
+            OSError: If the file cannot accept the complete record.
+        """
         try:
             assert self._file is not None
             written = self._file.write(encoded)
@@ -170,6 +183,7 @@ class TraceReader(BaseModel):
 
     @property
     def partial(self) -> bool:
+        """Return whether the trace is incomplete or truncated."""
         return self._partial
 
     def open(self) -> "TraceReader":
@@ -282,10 +296,29 @@ def convert_legacy(
 
 
 def _encode(record: TraceRecord) -> bytes:
+    """Serialize a validated record as one UTF-8 JSONL line.
+
+    Args:
+        record: Validated trace record to encode.
+
+    Returns:
+        JSON bytes terminated by a newline.
+    """
     return (record.model_dump_json() + "\n").encode("utf-8")
 
 
 def _decode(line: bytes) -> TraceRecord:
+    """Parse and validate one JSONL record.
+
+    Args:
+        line: UTF-8 JSON object bytes, optionally newline-terminated.
+
+    Returns:
+        Validated trace record.
+
+    Raises:
+        ValueError: If the bytes are invalid JSON or violate the schema.
+    """
     try:
         value = json.loads(line, parse_constant=lambda value: (
             _ for _ in ()).throw(ValueError(value)))
@@ -297,11 +330,20 @@ def _decode(line: bytes) -> TraceRecord:
 
 
 def _legacy_nonnegative_int(value: JsonValue) -> bool:
+    """Check whether a legacy JSON value is a nonnegative non-boolean int."""
     return (isinstance(value, int) and not isinstance(value, bool)
             and value >= 0)
 
 
 def _bounded_status(value: JsonValue) -> JsonValue:
+    """Sanitize and cap a status string for compact terminal metadata.
+
+    Args:
+        value: Candidate JSON status value.
+
+    Returns:
+        A printable ASCII string of at most 64 characters, or ``None``.
+    """
     if isinstance(value, str):
         return "".join(
             char if char.isascii() and char.isprintable() else "?"

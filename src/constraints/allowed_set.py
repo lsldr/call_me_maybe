@@ -7,7 +7,19 @@ from numpy.typing import NDArray
 def best_allowed(
     logits: NDArray[np.float32], allowed: NDArray[np.int32]
 ) -> int:
-    """Return the highest-scoring allowed ID, with ties favoring lowest ID."""
+    """Return the highest-scoring allowed ID, with ties favoring lowest ID.
+
+    Args:
+        logits: 1D array of scores for all tokens.
+        allowed: 1D array of allowed token IDs
+                (may be unsorted and have duplicates).
+
+    Returns:
+        The ID of the highest-scoring allowed token.
+
+    Raises:
+        ValueError: If logits or allowed are not 1D arrays, if allowed contains
+            non-integer values, or if allowed is empty."""
     scores = np.asarray(logits)
     ids = np.asarray(allowed)
     if scores.ndim != 1 or ids.ndim != 1:
@@ -25,7 +37,18 @@ def best_allowed(
 def best_sorted_allowed(
     logits: NDArray[np.float32], allowed: NDArray[np.int32]
 ) -> int:
-    """Select from immutable sorted unique IDs without sorting or deduping."""
+    """Select from immutable sorted unique IDs without sorting or deduping.
+
+    Args:
+        logits: 1D array of scores for all tokens.
+        allowed: 1D array of allowed token IDs (sorted and unique).
+
+    Returns:
+        The ID of the highest-scoring allowed token.
+
+    Raises:
+        ValueError: If logits or allowed are not 1D arrays, if allowed contains
+            non-integer values, or if allowed is empty."""
     scores = np.asarray(logits)
     ids = np.asarray(allowed)
     if scores.ndim != 1 or ids.ndim != 1:

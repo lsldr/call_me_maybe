@@ -36,6 +36,14 @@ def _validate_style(style: ContextStyle) -> None:
 
 
 def _parameter_schema(parameter: TypeDef) -> dict[str, object]:
+    """Serialize a parameter using the supported recursive tool schema.
+
+    Args:
+        parameter: Scalar, array, or fixed-property object definition.
+
+    Returns:
+        A schema mapping with every declared object property required.
+    """
     result: dict[str, object] = parameter.model_dump(exclude_none=True)
     if parameter.type == "object" and parameter.properties is not None:
         result["properties"] = {
@@ -113,19 +121,26 @@ def arguments_context(
     """Build a selected-function context ending at its argument object."""
     _validate_style(style)
     marker_tuple = tuple(markers)
-    if any(
-        parameter.type in {"array", "object"}
-        for parameter in selected.parameters.values()
-    ):
-        return _direct_arguments_context(selected, request, marker_tuple)
-
-    prefix = build_context([selected], request, marker_tuple, style=style)
     regex_schema = set(selected.parameters) == {
         "source_string", "regex", "replacement",
     } and all(
         parameter.type == "string"
         for parameter in selected.parameters.values()
     )
+    if any(
+        parameter.type in {"array", "object"}
+        for parameter in selected.parameters.values()
+    ):
+        return _direct_arguments_context(selected, request, marker_tuple)
+    if not regex_schema and any(
+        parameter.type == "string"
+        for parameter in selected.parameters.values()
+    ):
+        return _direct_arguments_context(
+            selected, request, marker_tuple, clarify_empty_strings=True,
+        )
+
+    prefix = build_context([selected], request, marker_tuple, style=style)
     if regex_schema and style == "examples":
         guidance = (
             "Quotes around a source or replacement delimit its contents; "
@@ -189,8 +204,20 @@ def _request_text(request: str, markers: Collection[str]) -> str:
 
 def _direct_arguments_context(
     selected: FunctionDef, request: str, markers: Collection[str],
+    *, clarify_empty_strings: bool = False,
 ) -> str:
-    """Build a readable nested context without JSON string wrapping."""
+    """Build a readable argument context without JSON string wrapping.
+
+    Args:
+        selected: Function whose input values must be extracted.
+        request: Original request, with quoted values left readable.
+        markers: Token spellings made inert inside external data.
+        clarify_empty_strings: Add explicit zero-character guidance for
+            ordinary scalar string parameters.
+
+    Returns:
+        A marker-safe context ending at the selected arguments object.
+    """
     system = (
         "Extract the function's INPUT arguments; do not compute its result. "
         "Return a JSON tool call with name and arguments. Quoted values in "
@@ -201,6 +228,11 @@ def _direct_arguments_context(
         "denotes those characters only.\nFunction: "
         + safe_json(tool_schema(selected), markers)
     )
+    if clarify_empty_strings:
+        system = (
+            'For an empty string, emit "" (zero characters), not escaped '
+            "quote characters.\n" + system
+        )
     context = "<|im_start|>system\n" + system + "<|im_end|>\n"
     return (
         context + "<|im_start|>user\n" + _request_text(request, markers)

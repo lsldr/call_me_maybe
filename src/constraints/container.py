@@ -13,7 +13,19 @@ from src.schemas.nested import SchemaLimits, array_bounds, validate_schema
 
 
 class ContainerFrame(BaseModel):
-    """One immutable parser frame; only bounded syntax state is retained."""
+    """One immutable parser frame; only bounded syntax state is retained.
+
+    Attributes:
+        node: Compiled schema node ID for this container.
+        phase: Current parser phase for this container.
+        index: Current property index for objects, or 0 for arrays.
+        count: Number of items consumed for arrays, or properties for objects.
+        key_offset: Current byte offset into the property key for objects.
+        string: Current string DFA state, or None if not parsing a string.
+        number: Current number DFA state, or None if not parsing a number.
+        literal_offset: Current byte offset into the literal for booleans/null.
+        literal: The literal bytes for booleans/null, or None if not parsing.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -29,7 +41,19 @@ class ContainerFrame(BaseModel):
 
 
 class ContainerState(BaseModel):
-    """Hashable continuation state for a nested JSON value."""
+    """Hashable continuation state for a nested JSON value.
+
+    This state represents the parser's position within a nested JSON structure,
+    including the current container, its properties, and the bytes consumed.
+
+    Attributes:
+        stack: A tuple of ContainerFrame objects representing the current
+            stack of nested containers.
+        started: A boolean indicating whether the root container was started.
+        done: A boolean indicating whether the root container was fully parsed.
+        suffix: A bytes object representing the suffix of the input that was
+            consumed but not yet validated against the following bytes.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -40,10 +64,24 @@ class ContainerState(BaseModel):
 
 
 class JSONContainerDFA(BaseModel):
-    """Validate a complete array/object value incrementally by bytes."""
+    """Validate a complete array/object value incrementally by bytes.
+
+    Attributes:
+        root_schema: The root schema node for the container.
+        limits: The schema limits for validation.
+        following: The bytes that follow the current input.
+        markers: A tuple of strings that mark the positions of the input.
+        _compiled_nodes: A tuple of compiled schema nodes for the DFA.
+        _compiled_children: A tuple of tuples representing the child node IDs
+            for each compiled node.
+        _compiled_keys: A tuple of tuples representing the property keys for
+            each compiled object node.
+    """
 
     model_config = ConfigDict(
-        frozen=True, extra="forbid", arbitrary_types_allowed=True,
+        frozen=True,
+        extra="forbid",
+        arbitrary_types_allowed=True,
         populate_by_name=True,
     )
 
@@ -56,6 +94,15 @@ class JSONContainerDFA(BaseModel):
     _compiled_keys: tuple[tuple[bytes, ...], ...] = PrivateAttr(default=())
 
     def __init__(self, **data: object) -> None:
+        """Initialize the DFA and compile its validated schema tree.
+
+        Args:
+            **data: Model fields, including the root schema and DFA options.
+
+        Raises:
+            ValueError: If the root is not a container or its schema
+                is invalid.
+        """
         super().__init__(**data)
         if self.root_schema.type not in {"array", "object"}:
             raise ValueError("container DFA root must be an array or object")
@@ -68,14 +115,24 @@ class JSONContainerDFA(BaseModel):
         keys: list[tuple[bytes, ...]] = []
 
         def compile_node(node: TypeDef) -> int:
+            """Append a schema node and its descendants to the compiled tables.
+
+            Args:
+                node: Schema node to compile.
+
+            Returns:
+                The node's index in the compiled tables.
+            """
             node_id = len(nodes)
             nodes.append(node)
             children.append(())
             properties = node.properties or {}
-            keys.append(tuple(
-                safe_json(key, self.markers).encode("utf-8")
-                for key in properties
-            ))
+            keys.append(
+                tuple(
+                    safe_json(key, self.markers).encode("utf-8")
+                    for key in properties
+                )
+            )
             if node.type == "array":
                 assert node.items is not None
                 child_ids: tuple[int, ...] = (compile_node(node.items),)
@@ -98,10 +155,9 @@ class JSONContainerDFA(BaseModel):
         """Return a stable cache identity that preserves property order."""
         payload = {
             "schema": self.root_schema.model_dump(
-                mode="json",
-                exclude_none=False),
-            "limits": self.limits.model_dump(
-                mode="json"),
+                mode="json", exclude_none=False
+            ),
+            "limits": self.limits.model_dump(mode="json"),
             "following": self.following.hex(),
             "markers": self.markers,
         }
@@ -109,8 +165,18 @@ class JSONContainerDFA(BaseModel):
         return hashlib.sha256(canonical.encode()).hexdigest()
 
     def _child(self, node_id: int, index: int) -> int:
-        return self._compiled_children[node_id][0 if self._compiled_nodes[
-            node_id].type == "array" else index]
+        """Return a compiled child ID by array item or object property index.
+
+        Args:
+            node_id: Parent node's compiled ID.
+            index: Child position; arrays always use their single item schema.
+
+        Returns:
+            The compiled ID of the selected child schema.
+        """
+        return self._compiled_children[node_id][
+            0 if self._compiled_nodes[node_id].type == "array" else index
+        ]
 
     def initial_state(self) -> ContainerState:
         """Return the immutable initial parser state.
@@ -121,9 +187,8 @@ class JSONContainerDFA(BaseModel):
         return ContainerState()
 
     def advance(
-            self,
-            state: ContainerState,
-            raw: bytes) -> ContainerState | None:
+        self, state: ContainerState, raw: bytes
+    ) -> ContainerState | None:
         """Consume raw bytes and return the next state, or reject the prefix.
 
         Args:
@@ -145,8 +210,9 @@ class JSONContainerDFA(BaseModel):
             byte = raw[i]
             if done:
                 candidate = suffix + raw[i:]
-                if (len(candidate) > len(self.following)
-                        or not self.following.startswith(candidate)):
+                if len(candidate) > len(
+                    self.following
+                ) or not self.following.startswith(candidate):
                     return None
                 suffix = candidate
                 i = len(raw)
@@ -156,17 +222,17 @@ class JSONContainerDFA(BaseModel):
                     i += 1
                     continue
                 wrong_root = (
-                    (byte == ord("[") and self.root_schema.type != "array")
-                    or (byte == ord("{")
-                        and self.root_schema.type != "object")
-                )
+                    byte == ord("[") and self.root_schema.type != "array"
+                ) or (byte == ord("{") and self.root_schema.type != "object")
                 if byte not in (ord("["), ord("{")) or wrong_root:
                     return None
                 started = True
                 stack.append(
                     ContainerFrame(
                         node=0,
-                        phase="ARRAY_FIRST" if byte == 91 else "OBJECT_FIRST"))
+                        phase="ARRAY_FIRST" if byte == 91 else "OBJECT_FIRST",
+                    )
+                )
                 i += 1
                 continue
 
@@ -195,11 +261,15 @@ class JSONContainerDFA(BaseModel):
             if frame.phase == "NUMBER":
                 assert frame.number is not None
                 if byte in b" \t\r\n,]}" and frame.number.phase in {
-                        "ZERO", "INT", "FRAC"}:
+                    "ZERO",
+                    "INT",
+                    "FRAC",
+                }:
                     stack.pop()
                     continue
                 number = NumberDFA(integer=node.type == "integer").advance(
-                    frame.number, bytes([byte]))
+                    frame.number, bytes([byte])
+                )
                 if number is None:
                     return None
                 stack[-1] = frame.model_copy(update={"number": number})
@@ -216,7 +286,8 @@ class JSONContainerDFA(BaseModel):
                     stack.pop()
                 else:
                     stack[-1] = frame.model_copy(
-                        update={"literal_offset": next_offset})
+                        update={"literal_offset": next_offset}
+                    )
                 i += 1
                 continue
 
@@ -233,7 +304,8 @@ class JSONContainerDFA(BaseModel):
                 offset += 1
                 if offset == len(key):
                     stack[-1] = frame.model_copy(
-                        update={"phase": "OBJECT_COLON", "key_offset": 0})
+                        update={"phase": "OBJECT_COLON", "key_offset": 0}
+                    )
                 else:
                     stack[-1] = frame.model_copy(update={"key_offset": offset})
                 i += 1
@@ -244,7 +316,7 @@ class JSONContainerDFA(BaseModel):
                     i += 1
                     continue
                 if byte == ord("}"):
-                    if (nodes[frame.node].properties or {}):
+                    if nodes[frame.node].properties or {}:
                         return None
                     stack.pop()
                     i += 1
@@ -267,13 +339,15 @@ class JSONContainerDFA(BaseModel):
                 "ARRAY_FIRST",
                 "ARRAY_NEXT",
                 "OBJECT_FIRST",
-                    "OBJECT_VALUE"}:
+                "OBJECT_VALUE",
+            }:
                 is_array = node.type == "array"
-                if frame.phase in {
-                        "ARRAY_FIRST", "OBJECT_FIRST"} and byte == (
-                        ord("]") if is_array else ord("}")):
-                    minimum, _ = array_bounds(
-                        node, self.limits) if is_array else (0, 0)
+                if frame.phase in {"ARRAY_FIRST", "OBJECT_FIRST"} and byte == (
+                    ord("]") if is_array else ord("}")
+                ):
+                    minimum, _ = (
+                        array_bounds(node, self.limits) if is_array else (0, 0)
+                    )
                     if is_array and frame.count < minimum:
                         return None
                     stack.pop()
@@ -286,13 +360,15 @@ class JSONContainerDFA(BaseModel):
                     if frame.count >= maximum:
                         return None
                 child_id = self._child(
-                    frame.node, frame.count if is_array else frame.index)
+                    frame.node, frame.count if is_array else frame.index
+                )
                 # mark container parent as awaiting its separator before
                 # pushing child
                 waiting = "ARRAY_SEPARATOR" if is_array else "OBJECT_SEPARATOR"
                 count = frame.count + 1 if is_array else frame.count
                 stack[-1] = frame.model_copy(
-                    update={"phase": waiting, "count": count})
+                    update={"phase": waiting, "count": count}
+                )
                 child = nodes[child_id]
                 opener = byte
                 if child.type in {"array", "object"}:
@@ -302,18 +378,27 @@ class JSONContainerDFA(BaseModel):
                     stack.append(
                         ContainerFrame(
                             node=child_id,
-                            phase=("ARRAY_FIRST" if wanted == 91
-                                   else "OBJECT_FIRST"),
+                            phase=(
+                                "ARRAY_FIRST"
+                                if wanted == 91
+                                else "OBJECT_FIRST"
+                            ),
                         )
                     )
                 elif child.type == "string":
                     if opener != ord('"'):
                         return None
-                    stack.append(ContainerFrame(
-                        node=child_id, phase="STRING", string=StringState()))
+                    stack.append(
+                        ContainerFrame(
+                            node=child_id, phase="STRING", string=StringState()
+                        )
+                    )
                 elif child.type in {"integer", "number"}:
-                    stack.append(ContainerFrame(
-                        node=child_id, phase="NUMBER", number=NumberState()))
+                    stack.append(
+                        ContainerFrame(
+                            node=child_id, phase="NUMBER", number=NumberState()
+                        )
+                    )
                     continue
                 else:
                     if child.type == "boolean":
@@ -322,12 +407,14 @@ class JSONContainerDFA(BaseModel):
                         literal = b"null"
                     if byte != literal[0]:
                         return None
-                    stack.append(ContainerFrame(
-                        node=child_id,
-                        phase="LITERAL",
-                        literal_offset=1,
-                        literal=literal,
-                    ))
+                    stack.append(
+                        ContainerFrame(
+                            node=child_id,
+                            phase="LITERAL",
+                            literal_offset=1,
+                            literal=literal,
+                        )
+                    )
                 i += 1
                 continue
             if frame.phase in {"ARRAY_SEPARATOR", "OBJECT_SEPARATOR"}:
@@ -358,10 +445,8 @@ class JSONContainerDFA(BaseModel):
                 continue
             return None
         return ContainerState(
-            stack=tuple(stack),
-            started=started,
-            done=done,
-            suffix=suffix)
+            stack=tuple(stack), started=started, done=done, suffix=suffix
+        )
 
     def next_bytes(self, state: ContainerState) -> set[int]:
         """Return byte values whose one-byte extension remains valid.
@@ -373,9 +458,10 @@ class JSONContainerDFA(BaseModel):
             The set of legal next byte values.
         """
         return {
-            b for b in range(256) if self.advance(
-                state, bytes(
-                    [b])) is not None}
+            b
+            for b in range(256)
+            if self.advance(state, bytes([b])) is not None
+        }
 
     def is_complete(self, state: ContainerState) -> bool:
         """Return whether the root value has closed.

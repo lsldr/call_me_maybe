@@ -150,6 +150,11 @@ def run_demo(
 
 
 def main() -> int:
+    """Parse CLI options, run the demo, and return its exit status.
+
+    Returns:
+        Zero when the demo artifact passes, otherwise one.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(

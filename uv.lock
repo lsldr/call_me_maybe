@@ -135,6 +135,7 @@ name = "call-me-maybe"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "accelerate" },
     { name = "llm-sdk" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
@@ -159,6 +160,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "accelerate", specifier = ">=1.0" },
     { name = "llm-sdk", editable = "llm_sdk" },
     { name = "numpy" },
     { name = "pydantic" },
@@ -595,7 +597,6 @@ name = "llm-sdk"
 version = "0.1.0"
 source = { editable = "llm_sdk" }
 dependencies = [
-    { name = "accelerate" },
     { name = "huggingface-hub" },
     { name = "torch" },
     { name = "transformers" },
@@ -603,7 +604,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "accelerate", specifier = ">=1.0" },
     { name = "huggingface-hub", specifier = ">=0.20.0" },
     { name = "torch", specifier = ">=2.0.0" },
     { name = "transformers", specifier = ">=4.40.0" },

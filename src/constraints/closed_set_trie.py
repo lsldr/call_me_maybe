@@ -23,7 +23,10 @@ class FunctionSetTrie(BaseModel):
     root: int = 0
 
     def set_targets(self, names: list[str]) -> None:
-        """Replace targets with JSON UTF-8 paths after the opening quote."""
+        """Replace targets with JSON UTF-8 paths after the opening quote.
+
+        Args:
+            names: A list of function names to be stored in the trie."""
         self.nodes = [TrieNode()]
         self.root = 0
         for name in names:
@@ -39,13 +42,27 @@ class FunctionSetTrie(BaseModel):
             self.nodes[node_index].terminal_name = name
 
     def search(self, name: str) -> bool:
-        """Return whether *name* is one of the current targets."""
+        """Return whether *name* is one of the current targets.
+
+        Args:
+            name: The function name to search for.
+
+        Returns:
+            True if the name is in the current targets, False otherwise."""
         spelling = json.dumps(name, ensure_ascii=False).encode("utf-8")[1:]
         node = self.advance(self.root, spelling)
         return node is not None and self.completed_name(node) == name
 
     def advance(self, node: int, raw_bytes: bytes) -> int | None:
-        """Return the node reached by all bytes without changing trie state."""
+        """Return the node reached by all bytes without changing trie state.
+
+        Args:
+            node: The index of the starting node.
+            raw_bytes: The bytes to consume.
+
+        Returns:
+            The index of the node reached after consuming all bytes, or None if
+            the path does not exist in the trie."""
         if node < 0 or node >= len(self.nodes):
             return None
         for byte in raw_bytes:
@@ -56,7 +73,16 @@ class FunctionSetTrie(BaseModel):
         return node
 
     def next_bytes(self, node: int) -> set[int]:
-        """Return valid next bytes at *node*."""
+        """Return valid next bytes at *node*.
+
+        Args:
+            node: The index of the node to query.
+
+        Returns:
+            A set of valid next byte values.
+
+        Raises:
+            ValueError: If *node* is out of range."""
         if node < 0 or node >= len(self.nodes):
             raise ValueError("node index is out of range")
         return set(self.nodes[node].children)
@@ -66,7 +92,16 @@ class FunctionSetTrie(BaseModel):
 
         The traversal is iterative so long names do not depend on Python's
         recursion limit. It stops as soon as a second terminal is found.
-        """
+
+        Args:
+            node: The index of the starting node.
+
+        Returns:
+            A tuple of the terminal name and the remaining byte suffix, or None
+            if there is no terminal or more than one terminal below the node.
+
+        Raises:
+            ValueError: If *node* is out of range."""
         if node < 0 or node >= len(self.nodes):
             raise ValueError("node index is out of range")
         stack: list[tuple[int, bytes]] = [(node, b"")]
@@ -83,7 +118,16 @@ class FunctionSetTrie(BaseModel):
         return found
 
     def completed_name(self, node: int) -> str | None:
-        """Return the original function name if *node* is terminal."""
+        """Return the original function name if *node* is terminal.
+
+        Args:
+            node: The index of the node to query.
+
+        Returns:
+            The original function name if the node is terminal, None otherwise.
+
+        Raises:
+            ValueError: If *node* is out of range."""
         if node < 0 or node >= len(self.nodes):
             raise ValueError("node index is out of range")
         return self.nodes[node].terminal_name

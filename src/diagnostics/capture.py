@@ -33,6 +33,11 @@ def attach_capture(caller: "FunctionCaller", writer: TraceWriter) -> None:
     previous_attempt = caller.attempt_observer
 
     def token(event: TraceEvent) -> None:
+        """Serialize a decoder token event and forward it to prior observer.
+
+        Args:
+            event: Decoder event containing token bytes and state snapshots.
+        """
         data: dict[str, JsonValue] = {
             "step": event.step, "token_id": event.token_id,
             "raw_hex": event.raw.hex(), "allowed_count": event.allowed_count,
@@ -50,6 +55,12 @@ def attach_capture(caller: "FunctionCaller", writer: TraceWriter) -> None:
             previous_trace(event)
 
     def attempt(kind: str, data: dict[str, JsonValue]) -> None:
+        """Write an attempt event and forward it to the previous observer.
+
+        Args:
+            kind: Trace event kind emitted by the caller.
+            data: JSON-compatible event fields.
+        """
         writer.emit(kind, data)
         if previous_attempt is not None:
             previous_attempt(kind, data)

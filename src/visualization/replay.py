@@ -143,6 +143,15 @@ def interactive(
 
 
 def __render(reader: TraceReader, index: int) -> str:
+    """Render one indexed trace record with its reconstructed state.
+
+    Args:
+        reader: Indexed source trace.
+        index: Record index to render.
+
+    Returns:
+        Plain-text view of the record and state at that position.
+    """
     from src.visualization.plain import render_view
 
     return render_view(reader.read(index), state_at(reader, index))
