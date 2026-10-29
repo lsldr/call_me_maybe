@@ -31,7 +31,7 @@ members = [
 ]
 
 [tool.uv.sources]
-llm-sdk = { workspace = true }
+llm_sdk = { workspace = true }
 
 [tool.uv.build-backend]
 module-root = ""

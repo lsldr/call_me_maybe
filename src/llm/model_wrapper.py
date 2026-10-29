@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-from llm_sdk import Small_LLM_Model
+from llm_sdk.llm_sdk import Small_LLM_Model
 import numpy as np
 from numpy.typing import NDArray
 from pydantic import (
@@ -71,15 +71,21 @@ class ModelWrapper(BaseModel):
         """
         if self.snapshot_path is None:
             self._sdk = Small_LLM_Model(
-                model_name=self.model_name, device=self.device,
+                model_name=self.model_name,
+                device=self.device,
             )
             self._vocab_file = self._sdk.get_path_to_vocab_file()
             self._merges_file = self._sdk.get_path_to_merges_file()
             self._tokenizer_file = self._sdk.get_path_to_tokenizer_file()
         else:
             snapshot = self.snapshot_path.resolve()
-            for filename in ("config.json", "tokenizer.json", "vocab.json",
-                             "merges.txt", "model.safetensors"):
+            for filename in (
+                "config.json",
+                "tokenizer.json",
+                "vocab.json",
+                "merges.txt",
+                "model.safetensors",
+            ):
                 if not (snapshot / filename).is_file():
                     raise ValueError(
                         f"Missing model asset: {snapshot / filename}"
@@ -87,7 +93,8 @@ class ModelWrapper(BaseModel):
             # The SDK accepts a local model directory publicly. Its Hub-only
             # path helpers do not, so use those same referenced local assets.
             self._sdk = Small_LLM_Model(
-                model_name=str(snapshot), device=self.device,
+                model_name=str(snapshot),
+                device=self.device,
                 trust_remote_code=False,
             )
             self._vocab_file = str(snapshot / "vocab.json")
