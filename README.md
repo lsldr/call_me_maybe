@@ -37,6 +37,36 @@ GPU/driver and the SDK's locked `accelerate` dependency. `--max-new-tokens`
 Missing/malformed input fails before model initialization. Empty requests write
 `[]`. Any failed request prevents replacement of the previous output file.
 
+Optional flags:
+all flags are used as below:
+```bash
+make run ARGS=[--flag flag_arg]
+```
+where `--flag` can be:
+- `--functions_definition` to specify the path for functions definitions in the json format
+- `--input` and `--output` to specify the paths for input prompts and function calls, both in the json format
+- `--device` to choose between `cpu`, `cuda`, or `mps`
+- `--max-new-tokens` for maximum tokens per generation, default is 128
+- `--max-context-tokens` maximum tokens for the context (including prompts, functions definitions, and examples, when applicable) passed for an LLM call
+- `--profile` to choose if bonus features (described at the end of this README) will be added
+- `--tokenizer` to choose local tokenizer implementation if set to `local` versus `sdk`
+- `--recovery` set to `retry` to enable repeated attempt if the LLM fails to score constrained set of tokens to allow for generation; retries are done with an error reason added to the context of LLM calls
+- `--model` to choose from Qwen/Qwen3-0.6B (default), HuggingFaceTB/SmolLM2-135M-Instruct, HuggingFaceTB/SmolLM2-360M-Instruct, and HuggingFaceTB/SmolLM-135M-Instruct
+- `--model-snapshot` to select some locally saved snapshot of the model (via its hash key); it contains a set of required tokens, paths to merges and tokenizer config files
+- `--diagnostics-output` path to select the output for the diagnostic summary of a run (`None` by default, which does not create a file with this summary)
+- `--trace-output`, goes to `data/traces` by default, a .jsonl log that contains the state of each prompt per run, also being a source for visuals (visuals can be run on these .jsonl after the run as well)
+- `--visual`, with no argument. If passed, shows live visual of the generation progress.
+
+Extra commands:
+- `make clean` cleans up cache files from pytest, mypy, uv
+- `make debug` runs the program with the `dbg` debugger
+- `make lint` and `make lint-strict` run linting with mypy and flake8, with strict mypy checks for the latter
+- `make test` runs the pytest suite
+- `make check` runs `make lint-strict` and `make test`
+- `make bench` runs the program with 10 extra prompts that represent other prompts that test different cases and some tricky edge cases like empty string parameters
+- `make visualize TRACE=path_to_trace_file` runs a visual with a saved trace
+
+
 ## The algorithm
 
 1. Validate function definitions and original prompts with Pydantic.
@@ -125,6 +155,7 @@ Input: `What is the sum of 2 and 3?`
 - [JSON specification](https://www.rfc-editor.org/rfc/rfc8259)
 - [Python JSON documentation](https://docs.python.org/3/library/json.html)
 - [GPT-2 byte alphabet reference](https://github.com/openai/gpt-2/blob/master/src/encoder.py)
+- [Trie](https://en.wikipedia.org/wiki/Trie)
 
 ### AI Usage
 GPT-6 Astra and GPT-6.1 Sol were used to:
@@ -132,7 +163,7 @@ GPT-6 Astra and GPT-6.1 Sol were used to:
 - Run test suites and generate diagnostic reports.
 - Generate docstring drafts for function and method signatures 
 - Create an implementation plan with pseudocode for `TraceWriter` and nested function arguments DFA
-- Get advice like choosing between having a class (when knowledge of state and object use are required) with methods and a function (when only a change of state is needed, or simple operations are done), and placing lazy imports as they are to import some packages only when they are required
+- Get advice like choosing between having a class (when knowledge of state and object use are required) with methods and a function (when only a change of state is needed, or simple operations are done), and placing lazy imports to import some packages only when they are required
 - Explain how tokenizers build the token vocab; differences in raw byte values of symbols and their representation in different places and how unicode characters are handled
 - Add partial UTF-8 char handling for string DFAs (get special symbol hex codes and explain what their additions mean)
 - Choose optimal limits for maximum context tokens and maximum new tokens per LLM call
